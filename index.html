@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>學思創客</title>
+<meta name="author" content="何政學">
+<meta name="description" content="學思創客：何政學老師的創客作品與教學工具。Maker 檔案檢視器、雷切平衡玩具課程。">
+<!-- © 2026 新北市立中正國中何政學教師｜授權：CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f5f6f3; --paper:#ffffff; --ink:#16212b; --mute:#58646f; --line:#d9ddd6; --soft:#eceee8; --accent:#d8901f;
+  --f-name:"Noto Serif TC","Songti TC",serif; --f-body:"Noto Sans TC",system-ui,-apple-system,"Microsoft JhengHei",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root{--bg:#11161b;--paper:#182028;--ink:#e6eaee;--mute:#97a3ad;--line:#2a343d;--soft:#1e2730;--accent:#efa93a;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:960px;margin:0 auto;padding-block:56px 32px}
+a{color:inherit}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.label{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;color:var(--mute);text-transform:uppercase}
+h1{font-family:var(--f-name);font-weight:900;font-size:clamp(40px,8vw,64px);line-height:1.1;margin:6px 0 4px;letter-spacing:.08em}
+.en{font-family:var(--f-mono);font-size:13px;letter-spacing:.3em;color:var(--mute)}
+.lead{max-width:560px;color:var(--mute);margin:20px 0 32px}
+.works{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:16px}
+.card{display:flex;flex-direction:column;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;text-decoration:none;transition:border-color .15s,transform .15s}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tag{align-self:flex-start;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--mute)}
+.card h2{margin:0;font-size:19px}
+.card p{margin:0;color:var(--mute);font-size:15px;line-height:1.65}
+.card .go{margin-top:auto;padding-top:6px;font-family:var(--f-mono);font-size:13px}
+footer{margin-top:48px;border-top:1px solid var(--line);padding-top:20px;font-size:13px;color:var(--mute);display:flex;flex-wrap:wrap;gap:4px 16px}
+footer a{text-underline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="label"><a href="/" style="text-decoration:none">← 何政學</a></div>
+  <h1>學思創客</h1>
+  <div class="en">XUESI MAKER</div>
+  <p class="lead">把課堂上遇到的問題，做成學生打開就能用的工具；把科技原理，做成能動手組起來的作品。</p>
+  <div class="works">
+    <a class="card" href="viewer/">
+      <span class="tag">工具</span>
+      <h2>Maker 檔案檢視器</h2>
+      <p>在瀏覽器裡看 3D 列印的 STL 和雷切的 SVG、DXF：尺寸、重量、切割長度與時間、閉合檢查、重心。檔案不會上傳。</p>
+      <span class="go">開啟 →</span>
+    </a>
+    <a class="card" href="https://sites.google.com/view/xuemmaker/" target="_blank" rel="noopener">
+      <span class="tag">課程</span>
+      <h2>雷切平衡玩具</h2>
+      <p>平衡鳥、平衡太空站：從找重心開始的 STEAM 課程，國中到國小都能做。</p>
+      <span class="go">開啟 →</span>
+    </a>
+  </div>
+  <footer>
+    <span>網站作者：新北市立中正國中何政學教師</span>
+    <span>授權：<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a></span>
+  </footer>
+</div>
+</body>
+</html>

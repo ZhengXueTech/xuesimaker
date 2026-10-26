@@ -1,0 +1,1050 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Maker 檔案檢視器</title>
+<meta name="author" content="何政學">
+<!-- Maker 檔案檢視器　© 2026 新北市立中正國中何政學教師
+     授權：CC BY-NC-SA 4.0（姓名標示－非商業性－相同方式分享）https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant
+     作者自主開發，使用或改作請保留本段署名。 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* 版面：左邊大 3D 視窗（像切片軟體的列印平台），右邊一欄工具；手機改上下排 */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --line:#d5dbe2; --fg:#1d2733; --mute:#5f6b78;
+  --accent:#e2630f; --accent-ink:#ffffff; --bed:#f7f9fb; --grid:#c9d1da; --grid2:#e1e6ec;
+  --ok:#1f8a4c; --warn:#b7791f; --bad:#c53030; --soft:#f4f6f8;
+  --f-body:"Noto Sans TC",system-ui,-apple-system,"Microsoft JhengHei",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --panel:#1a2129; --line:#2c3642; --fg:#e4e9ef; --mute:#93a0ae;
+  --accent:#f0813a; --accent-ink:#1a1006; --bed:#161c23; --grid:#3a4553; --grid2:#252e38;
+  --ok:#4cc38a; --warn:#e0a84a; --bad:#f07070; --soft:#202832; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --panel:#1a2129; --line:#2c3642; --fg:#e4e9ef; --mute:#93a0ae;
+  --accent:#f0813a; --accent-ink:#1a1006; --bed:#161c23; --grid:#3a4553; --grid2:#252e38;
+  --ok:#4cc38a; --warn:#e0a84a; --bad:#f07070; --soft:#202832; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;
+  display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box}
+header{display:flex;align-items:center;gap:12px;padding-block:10px;flex-wrap:wrap}
+h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.02em;text-wrap:balance}
+h1 small{font-family:var(--f-num);font-weight:400;color:var(--mute);font-size:12px;margin-left:6px}
+.sp{flex:1}
+.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.on{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;padding-bottom:12px}
+#stage{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bed);min-height:300px;touch-action:none}
+#stage canvas{display:block;width:100%;height:100%}
+#hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--mute);pointer-events:none}
+#views{position:absolute;top:10px;left:10px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 20px)}
+#views .btn{padding:3px 9px;font-size:12px}
+#drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--accent) 18%,transparent);border:3px dashed var(--accent);border-radius:12px;font-size:20px;font-weight:700;color:var(--fg)}
+#stage.dragging #drop{display:flex}
+#measureTag{position:absolute;padding:3px 8px;border-radius:6px;background:var(--fg);color:var(--panel);font-family:var(--f-num);font-size:13px;pointer-events:none;transform:translate(-50%,-130%);white-space:nowrap}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;min-width:0;display:flex;flex-direction:column;gap:16px}
+section h2{font-size:12px;letter-spacing:.08em;color:var(--mute);margin:0 0 8px;font-weight:700}
+.files{display:flex;flex-direction:column;gap:4px}
+.file{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;cursor:pointer;min-width:0}
+.file.sel{border-color:var(--accent);background:var(--soft)}
+.file .sw{width:12px;height:12px;border-radius:3px;flex:none}
+.file .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file button{border:0;background:none;color:var(--mute);cursor:pointer;font:inherit;padding:0 4px}
+.file button:hover{color:var(--fg)}
+.empty{color:var(--mute);font-size:13px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline}
+.kv dt{color:var(--mute);font-size:13px}
+.kv dd{margin:0;text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.big{font-size:22px;font-weight:600}
+.unit{font-size:12px;color:var(--mute);margin-left:3px}
+.pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:12px;font-family:var(--f-body)}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+label.chk{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0}
+select,input[type=number]{font:inherit;background:var(--soft);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+input[type=number]{width:70px;font-family:var(--f-num)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.note{font-size:12px;color:var(--mute);margin:6px 0 0}
+#mres{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.layers{display:flex;flex-direction:column}
+.layer{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.layer:first-child{border-top:0}
+.layer .sw{width:12px;height:12px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--line)}
+.layer .nm{flex:1;min-width:0;font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+.layer .nm small{display:block;color:var(--mute);font-size:11px}
+.checks{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.checks .pill{white-space:normal;text-align:right}
+h3.sub{font-size:12px;color:var(--mute);margin:12px 0 2px;font-weight:700}
+.linkbtn{font:inherit;font-size:13px;border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;align-self:flex-start}
+#laserSec input[type=number]{width:64px}
+.credit{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--mute);padding-bottom:10px}
+.credit a{color:inherit;text-underline-offset:3px}
+.credit a:hover{color:var(--accent)}
+@media (max-width:760px){
+  html,body{height:auto}
+  main{grid-template-columns:1fr}
+  #stage{height:58vh}
+  aside{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header>
+  <h1>Maker 檔案檢視器<small>STL・SVG・DXF｜單位 mm</small></h1>
+  <div class="sp"></div>
+  <button class="btn pri" id="openBtn">開啟檔案</button>
+  <input type="file" id="fileIn" accept=".stl,.svg,.dxf,.zip" multiple hidden>
+</header>
+<main>
+  <div id="stage">
+    <div id="views">
+      <button class="btn" data-view="iso">等角</button><button class="btn" data-view="front">前</button><button class="btn" data-view="back">後</button><button class="btn" data-view="left">左</button><button class="btn" data-view="right">右</button><button class="btn" data-view="top">上</button><button class="btn" data-view="bottom">下（底面）</button>
+    </div>
+    <div id="hint">左鍵拖曳旋轉　右鍵或兩指拖曳平移　滾輪或兩指縮放　可以直接把檔案拖進來</div>
+    <div id="measureTag" hidden></div>
+    <div id="drop">放開就開啟</div>
+  </div>
+  <aside>
+    <section>
+      <h2>檔案</h2>
+      <div class="files" id="files"></div>
+      <p class="note">3D 列印開 .stl；雷切開 .svg、.dxf；也能直接開裝這些檔的 .zip。檔案只在這台電腦的瀏覽器裡讀，不會上傳。</p>
+      <div class="row" style="margin-top:6px;gap:6px 14px"><span class="note" style="margin:0">看範例：</span><button class="linkbtn" id="sSample">3D 列印（手機支架）</button><button class="linkbtn" id="lSample">雷切（手機支架）</button></div>
+    </section>
+    <section id="laserSec" hidden>
+      <h2>雷切設定</h2>
+      <label class="chk">板材
+        <select id="lMat"><option value="basswood">椴木合板</option><option value="mdf">MDF 密集板</option><option value="acrylic">壓克力</option><option value="card">瓦楞紙板</option></select>
+      </label>
+      <label class="chk">板厚（mm）<input type="number" id="lThk" value="3" step="0.5" min="0.2" max="50"></label>
+      <label class="chk">切割速度（mm/s）<input type="number" id="lSpd" value="10" step="1" min="0.1"></label>
+      <label class="chk">切割次數<input type="number" id="lPass" value="1" step="1" min="1" max="10"></label>
+      <label class="chk">雕刻線速度（mm/s）<input type="number" id="lEng" value="60" step="5" min="0.1"></label>
+      <label class="chk">檔案單位<select id="lUnit"></select></label>
+      <p class="note" id="lHow"></p>
+      <h3 class="sub">圖層（依線條顏色分）</h3>
+      <div class="layers" id="layers"></div>
+      <label class="chk" style="margin-top:6px">顯示重心<input type="checkbox" id="lCog" checked></label>
+      <p class="note">時間只算雷射走線，沒算空跑和加減速，實際大約多 1～3 成。重心以整片平放計算，適合平衡鳥這類單片作品；黃點就是要讓支點對準的位置。</p>
+    </section>
+    <section>
+      <h2 id="infoTitle">尺寸</h2>
+      <dl class="kv" id="info"></dl>
+    </section>
+    <section id="wtSec">
+      <h2>重量估計</h2>
+      <div class="row">
+        <select id="mat" aria-label="材料">
+          <option value="1.24">PLA（1.24 g/cm³）</option>
+          <option value="1.27">PETG（1.27）</option>
+          <option value="1.04">ABS（1.04）</option>
+          <option value="1.07">ASA（1.07）</option>
+          <option value="1.21">TPU（1.21）</option>
+        </select>
+        <label class="row" style="gap:4px">× <input type="number" id="fac" value="1.00" step="0.01" min="0.1" max="1.5" aria-label="校正係數"></label>
+      </div>
+      <dl class="kv" style="margin-top:8px"><dt>估計重量</dt><dd><span class="big" id="wt">—</span><span class="unit">g</span></dd></dl>
+      <p class="note">用實心體積算。壁厚 1～2 mm 的薄件幾乎是實心，填 0.95 跟實秤最接近；像範例支架這種厚的零件內部有填充（常用 15～20%），實際會輕很多。</p>
+    </section>
+    <section>
+      <h2>顯示</h2>
+      <label class="chk">顯示稜線<input type="checkbox" id="edges" checked></label>
+      <label class="chk">顯示列印平台<input type="checkbox" id="bedOn" checked></label>
+      <label class="chk">平台大小
+        <select id="bedSize"><optgroup label="3D 列印機"><option value="180">180 × 180（A1 mini）</option><option value="220" selected>220 × 220</option><option value="256">256 × 256（A1／P1S）</option><option value="300">300 × 300</option></optgroup><optgroup label="雷切機"><option value="300x200">300 × 200</option><option value="400x300">400 × 300</option><option value="500x300">500 × 300</option><option value="600x400">600 × 400</option><option value="900x600">900 × 600</option><option value="1300x900">1300 × 900</option></optgroup></select>
+      </label>
+      <label class="chk" style="display:block">剖面高度：<span id="cutTxt">不切</span>
+        <input type="range" id="cut" min="0" max="100" value="100" aria-label="剖面高度">
+      </label>
+      <p class="note">往左拉就從上面一層一層切掉，可以看內部厚度。切到的地方會顯示成紅色。</p>
+    </section>
+    <section>
+      <h2>量測</h2>
+      <div class="row"><button class="btn" id="mBtn">開始量兩點距離</button><button class="btn" id="mClr">清除</button></div>
+      <div id="mres" class="note">點模型表面上的兩個點，就會顯示距離。</div>
+    </section>
+  </aside>
+</main>
+<footer class="credit">
+  <span>網站作者：新北市立中正國中何政學教師</span>
+  <span>授權：<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a></span>
+  <span>更多作品：<a href="https://sites.google.com/view/xuemmaker/" target="_blank" rel="noopener">學思創客</a></span>
+</footer>
+
+<script src="../lib/three.min.js"></script>
+<script src="../lib/SVGLoader.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const COLORS = [0x3b82c4, 0xe2630f, 0x2f9e6b, 0x9b59b6, 0xd4a017, 0xd14b6f];
+
+// ---------- three 基本 ----------
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.localClippingEnabled = true;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.5, 5000);
+camera.up.set(0, 0, 1);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
+const sun2 = new THREE.DirectionalLight(0xffffff, 0.25); sun2.position.set(-1, 1, -0.5); scene.add(sun2);
+const world = new THREE.Group(); scene.add(world);     // 模型放這裡（整組平移到平台中心）
+const bedG = new THREE.Group(); scene.add(bedG);
+const measureG = new THREE.Group(); scene.add(measureG);
+const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e6);
+
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function applyTheme() {
+  renderer.setClearColor(new THREE.Color(cssVar('--bed') || '#f7f9fb'));
+  buildBed(); requestDraw();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- 相機（Z 朝上，自寫軌道） ----------
+const orbit = { target: new THREE.Vector3(), dist: 300, theta: -Math.PI / 4 - Math.PI / 2, phi: 0.6 };
+function placeCam() {
+  const { target: t, dist: d, theta, phi } = orbit;
+  camera.position.set(t.x + d * Math.cos(phi) * Math.cos(theta), t.y + d * Math.cos(phi) * Math.sin(theta), t.z + d * Math.sin(phi));
+  camera.lookAt(t);
+  sun.position.copy(camera.position).add(new THREE.Vector3(40, -30, 120));
+  updateMeasureTag();
+}
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); requestDraw();
+}
+new ResizeObserver(resize).observe(stage);
+let drawQueued = false;
+function requestDraw() { if (drawQueued) return; drawQueued = true; requestAnimationFrame(() => { drawQueued = false; placeCam(); renderer.render(scene, camera); }); }
+
+const ptrs = new Map(); let gesture = null, moved = 0;
+stage.addEventListener('contextmenu', (e) => e.preventDefault());
+stage.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('#views')) return;
+  stage.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  moved = 0; gesture = { pan: e.button === 2 || e.shiftKey };
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!ptrs.has(e.pointerId)) return;
+  const p = ptrs.get(e.pointerId), dx = e.clientX - p.x, dy = e.clientY - p.y;
+  moved += Math.abs(dx) + Math.abs(dy);
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()], d0 = Math.hypot(a.x - b.x, a.y - b.y);
+    p.x = e.clientX; p.y = e.clientY;
+    const [a2, b2] = [...ptrs.values()], d1 = Math.hypot(a2.x - b2.x, a2.y - b2.y);
+    if (d0 > 0) orbit.dist = clampDist(orbit.dist * d0 / d1);
+    pan(dx / 2, dy / 2);
+  } else {
+    p.x = e.clientX; p.y = e.clientY;
+    if (gesture && gesture.pan) pan(dx, dy);
+    else { orbit.theta -= dx * 0.008; orbit.phi = Math.max(-1.55, Math.min(1.55, orbit.phi + dy * 0.008)); }
+  }
+  requestDraw();
+});
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size === 0 && moved < 6 && measuring) pickPoint(e);
+}
+stage.addEventListener('pointerup', endPtr); stage.addEventListener('pointercancel', endPtr);
+stage.addEventListener('wheel', (e) => { e.preventDefault(); orbit.dist = clampDist(orbit.dist * Math.exp(e.deltaY * 0.0012)); requestDraw(); }, { passive: false });
+function clampDist(d) { return Math.max(5, Math.min(3000, d)); }
+function pan(dx, dy) {
+  const k = orbit.dist * Math.tan(camera.fov * Math.PI / 360) * 2 / stage.clientHeight;
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+  orbit.target.addScaledVector(right, -dx * k).addScaledVector(up, dy * k);
+}
+const VIEWS = { iso: [-Math.PI * 0.75, 0.6], front: [-Math.PI / 2, 0.02], back: [Math.PI / 2, 0.02], left: [Math.PI, 0.02], right: [0, 0.02], top: [-Math.PI / 2, 1.55], bottom: [-Math.PI / 2, -1.55] };
+document.querySelectorAll('#views [data-view]').forEach((b) => b.onclick = () => { const v = VIEWS[b.dataset.view]; orbit.theta = v[0]; orbit.phi = v[1]; fitView(); });
+
+// ---------- 讀檔 ----------
+function parseSTL(buf) {
+  const dv = new DataView(buf);
+  if (buf.byteLength >= 84) {
+    const n = dv.getUint32(80, true);
+    if (84 + n * 50 === buf.byteLength) {
+      const pos = new Float32Array(n * 9);
+      for (let i = 0; i < n; i++) { const o = 84 + i * 50 + 12; for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(o + k * 4, true); }
+      return pos;
+    }
+  }
+  const txt = new TextDecoder().decode(buf);
+  if (!/facet/i.test(txt)) throw new Error('這不是 STL 檔，或檔案壞了');
+  const re = /vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g, out = []; let m;
+  while ((m = re.exec(txt))) out.push(+m[1], +m[2], +m[3]);
+  if (!out.length || out.length % 9) throw new Error('文字格式 STL 讀不完整');
+  return new Float32Array(out);
+}
+async function inflate(u8, fmt) {
+  const ds = new DecompressionStream(fmt);
+  return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(ds)).arrayBuffer());
+}
+async function unzip(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf); let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('壓縮檔讀不到目錄');
+  const cnt = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true); const out = [];
+  for (let k = 0; k < cnt; k++) {
+    const flag = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), loc = dv.getUint32(p + 42, true);
+    const nameBytes = u8.subarray(p + 46, p + 46 + nl);
+    let name; try { name = new TextDecoder((flag & 0x800) ? 'utf-8' : 'utf-8', { fatal: true }).decode(nameBytes); } catch { name = new TextDecoder('big5').decode(nameBytes); }
+    p += 46 + nl + el + cl;
+    if (!/\.(stl|svg|dxf)$/i.test(name) || /(^|\/)__MACOSX\//.test(name)) continue;
+    const ln = dv.getUint16(loc + 26, true), le = dv.getUint16(loc + 28, true), start = loc + 30 + ln + le, data = u8.subarray(start, start + csize);
+    let raw;
+    if (method === 0) raw = data.slice();
+    else if (method === 8) raw = await inflate(data, 'deflate-raw');
+    else throw new Error(name + '：不支援的壓縮方式');
+    out.push({ name: name.split('/').pop(), buf: raw.buffer });
+  }
+  if (!out.length) throw new Error('壓縮檔裡沒有 STL、SVG 或 DXF');
+  return out;
+}
+
+// ---------- 模型 ----------
+const models = []; let selId = null, nextId = 1;
+const matCut = new THREE.MeshBasicMaterial({ color: 0xd63a3a, side: THREE.BackSide, clippingPlanes: [cutPlane], polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 });
+function addModel(name, pos) {
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.computeVertexNormals(); geo.computeBoundingBox();
+  const color = COLORS[(nextId - 1) % COLORS.length];
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0.02, side: THREE.FrontSide, clippingPlanes: [cutPlane] });
+  const g = new THREE.Group(), mesh = new THREE.Mesh(geo, mat), back = new THREE.Mesh(geo, matCut);
+  g.add(mesh, back);
+  let edges = null;
+  try { edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: 0x0b1015, transparent: true, opacity: 0.35, clippingPlanes: [cutPlane] })); edges.visible = $('edges').checked; g.add(edges); } catch {}
+  world.add(g);
+  const m = { id: nextId++, name, pos, geo, g, mesh, edges, color, visible: true, stats: computeStats(pos) };
+  models.push(m); selId = m.id; layout(); renderFiles(); renderInfo(); fitView();
+  return m;
+}
+function computeStats(p) {
+  let vol = 0, area = 0; const n = p.length / 9;
+  for (let i = 0; i < p.length; i += 9) {
+    const ax = p[i], ay = p[i + 1], az = p[i + 2], bx = p[i + 3], by = p[i + 4], bz = p[i + 5], cx = p[i + 6], cy = p[i + 7], cz = p[i + 8];
+    vol += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    const ux = bx - ax, uy = by - ay, uz = bz - az, wx = cx - ax, wy = cy - ay, wz = cz - az;
+    area += Math.hypot(uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx) / 2;
+  }
+  // 封閉檢查：每條邊要剛好被兩個三角形共用
+  const key = (i) => p[i] + ',' + p[i + 1] + ',' + p[i + 2];
+  const vid = new Map(), id = (i) => { const k = key(i); let v = vid.get(k); if (v === undefined) { v = vid.size; vid.set(k, v); } return v; };
+  const E = new Map();
+  for (let t = 0; t < n; t++) {
+    const a = id(t * 9), b = id(t * 9 + 3), c = id(t * 9 + 6);
+    for (const [u, v] of [[a, b], [b, c], [c, a]]) { const k = u < v ? u * 4194304 + v : v * 4194304 + u; E.set(k, (E.get(k) || 0) + 1); }
+  }
+  let open = 0, nonman = 0; for (const c of E.values()) { if (c === 1) open++; else if (c > 2) nonman++; }
+  return { tris: n, vol: Math.abs(vol), area, open, nonman, flipped: vol < 0 };
+}
+function layout() {
+  // 整組放到平台中央、底面貼平台（Z=0）
+  const box = new THREE.Box3(); world.position.set(0, 0, 0);
+  for (const m of models) if (m.visible) box.union(m.bbox || m.geo.boundingBox);
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  world.position.set(-c.x, -c.y, -box.min.z);
+}
+function worldBox() { world.updateMatrixWorld(true); const b = new THREE.Box3(); for (const m of models) if (m.visible) { if (m.bbox) b.union(m.bbox.clone().applyMatrix4(world.matrixWorld)); else b.expandByObject(m.mesh); } return b; }
+function fitView() {
+  world.updateMatrixWorld(true);
+  const b = worldBox(); if (b.isEmpty()) { requestDraw(); return; }
+  const s = b.getBoundingSphere(new THREE.Sphere());
+  orbit.target.copy(s.center); orbit.dist = clampDist(s.radius / Math.sin(camera.fov * Math.PI / 360) * 1.15);
+  updateCutRange(); requestDraw();
+}
+function removeModel(id) {
+  const i = models.findIndex((m) => m.id === id); if (i < 0) return;
+  const m = models[i]; world.remove(m.g); if (m.kind === 'laser') disposeGroup(m.g); else m.geo.dispose(); models.splice(i, 1);
+  if (selId === id) selId = models.length ? models[models.length - 1].id : null;
+  clearMeasure(); layout(); renderFiles(); renderInfo(); fitView();
+}
+
+// ---------- 介面 ----------
+const fmt = (v, d = 1) => Number(v).toLocaleString('zh-TW', { minimumFractionDigits: d, maximumFractionDigits: d });
+const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+function renderFiles() {
+  const box = $('files'); box.innerHTML = '';
+  if (!models.length) { box.innerHTML = '<div class="empty">還沒有開檔。按上面「開啟檔案」，或把檔案拖到左邊的視窗。</div>'; return; }
+  for (const m of models) {
+    const d = document.createElement('div'); d.className = 'file' + (m.id === selId ? ' sel' : '');
+    d.innerHTML = `<span class="sw" style="background:${hex(m.color)}"></span><span class="nm" title="${esc(m.name)}">${esc(m.name)}</span><button title="顯示／隱藏" aria-label="顯示或隱藏">${m.visible ? '隱藏' : '顯示'}</button><button title="關閉這個檔" aria-label="關閉">✕</button>`;
+    d.onclick = () => { selId = m.id; renderFiles(); renderInfo(); };
+    const [bv, bx] = d.querySelectorAll('button');
+    bv.onclick = (e) => { e.stopPropagation(); m.visible = !m.visible; m.g.visible = m.visible; layout(); renderFiles(); fitView(); };
+    bx.onclick = (e) => { e.stopPropagation(); removeModel(m.id); };
+    box.appendChild(d);
+  }
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+function renderInfo() {
+  const m = models.find((x) => x.id === selId), el = $('info');
+  const isL = !!(m && m.kind === 'laser'); $('laserSec').hidden = !isL; $('wtSec').hidden = isL;
+  if (isL) return renderLaserInfo(m);
+  if (!m) { el.innerHTML = '<dt>—</dt><dd></dd>'; $('wt').textContent = '—'; $('infoTitle').textContent = '尺寸'; return; }
+  $('infoTitle').textContent = '尺寸｜' + m.name;
+  const b = m.geo.boundingBox, sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z, st = m.stats;
+  const [bw, bh] = parseBed($('bedSize').value), fits = sx <= bw && sy <= bh;
+  let seal;
+  if (st.open === 0) seal = '<span class="pill ok">封閉，可以切片</span>';
+  else seal = `<span class="pill bad">有破洞（${st.open} 條邊沒接上）</span>`;
+  el.innerHTML = `
+    <dt>長 X</dt><dd>${fmt(sx)}<span class="unit">mm</span></dd>
+    <dt>寬 Y</dt><dd>${fmt(sy)}<span class="unit">mm</span></dd>
+    <dt>高 Z</dt><dd>${fmt(sz)}<span class="unit">mm</span></dd>
+    <dt>平台</dt><dd>${fits ? '<span class="pill ok">放得下</span>' : `<span class="pill bad">超出 ${bw} × ${bh} mm 平台</span>`}</dd>
+    <dt>體積</dt><dd>${fmt(st.vol / 1000, 2)}<span class="unit">cm³</span></dd>
+    <dt>表面積</dt><dd>${fmt(st.area / 100, 1)}<span class="unit">cm²</span></dd>
+    <dt>三角面</dt><dd>${st.tris.toLocaleString('zh-TW')}</dd>
+    <dt>模型檢查</dt><dd>${seal}</dd>`;
+  updateWeight();
+}
+function updateWeight() {
+  const m = models.find((x) => x.id === selId); if (!m || !m.stats) { $('wt').textContent = '—'; return; }
+  const w = m.stats.vol / 1000 * (+$('mat').value) * (+$('fac').value || 1);
+  $('wt').textContent = fmt(w, 2);
+  try { localStorage.setItem('stlv', JSON.stringify({ mat: $('mat').value, fac: $('fac').value, bed: $('bedSize').value })); } catch {}
+}
+$('mat').onchange = updateWeight; $('fac').oninput = updateWeight;
+$('edges').onchange = () => { for (const m of models) if (m.edges) m.edges.visible = $('edges').checked; requestDraw(); };
+$('bedOn').onchange = () => { bedG.visible = $('bedOn').checked; requestDraw(); };
+$('bedSize').onchange = () => { if ($('bedSize').value.includes('x')) { try { localStorage.setItem('stlv-lbed', $('bedSize').value); } catch {} } buildBed(); renderInfo(); requestDraw(); };
+function parseBed(v) { const a = String(v).split('x').map(Number); return [a[0] || 220, a[1] || a[0] || 220]; }
+try { const s = JSON.parse(localStorage.getItem('stlv') || '{}'); if (s.mat) $('mat').value = s.mat; if (s.fac) $('fac').value = s.fac; if (s.bed) $('bedSize').value = s.bed; if (!$('bedSize').value) $('bedSize').value = '220'; } catch {}
+
+// 平台
+function buildBed() {
+  while (bedG.children.length) { const c = bedG.children.pop(); c.geometry.dispose(); }
+  const [BW, BH] = parseBed($('bedSize').value), hw = BW / 2, h = BH / 2, minor = [], major = [];
+  for (let x = -hw; x <= hw + 1e-6; x += 10) (Math.abs(Math.round(x)) % 50 === 0 ? major : minor).push(x, -h, 0, x, h, 0);
+  for (let y = -h; y <= h + 1e-6; y += 10) (Math.abs(Math.round(y)) % 50 === 0 ? major : minor).push(-hw, y, 0, hw, y, 0);
+  const mk = (arr, col) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: new THREE.Color(col) })); };
+  bedG.add(mk(minor, cssVar('--grid2') || '#e1e6ec'), mk(major, cssVar('--grid') || '#c9d1da'));
+  const fr = [-hw, -h, 0, hw, -h, 0, hw, -h, 0, hw, h, 0, hw, h, 0, -hw, h, 0, -hw, h, 0, -hw, -h, 0];
+  bedG.add(mk(fr, cssVar('--accent') || '#e2630f'));
+  // 前方標記（平台前緣中間的小三角形）
+  const tri = new THREE.BufferGeometry(); tri.setAttribute('position', new THREE.Float32BufferAttribute([-6, -h - 2, 0, 6, -h - 2, 0, 0, -h - 10, 0], 3));
+  bedG.add(new THREE.Mesh(tri, new THREE.MeshBasicMaterial({ color: new THREE.Color(cssVar('--accent') || '#e2630f'), side: THREE.DoubleSide })));
+}
+
+// 剖面
+let cutMax = 100;
+function updateCutRange() { const b = worldBox(); cutMax = b.isEmpty() ? 100 : b.max.z; applyCut(); }
+function applyCut() {
+  const v = +$('cut').value;
+  for (const m of models) if (m.backMesh) m.backMesh.visible = v < 100;
+  if (v >= 100) { cutPlane.constant = 1e6; $('cutTxt').textContent = '不切'; }
+  else { const z = cutMax * v / 100; cutPlane.constant = z; $('cutTxt').textContent = `Z = ${fmt(z)} mm`; }
+  requestDraw();
+}
+$('cut').oninput = applyCut;
+
+// 量測
+let measuring = false, mPts = [];
+const ray = new THREE.Raycaster();
+$('mBtn').onclick = () => { measuring = !measuring; $('mBtn').classList.toggle('on', measuring); $('mBtn').textContent = measuring ? '量測中…（再按一次結束）' : '開始量兩點距離'; stage.style.cursor = measuring ? 'crosshair' : ''; };
+$('mClr').onclick = clearMeasure;
+function clearMeasure() { mPts = []; while (measureG.children.length) measureG.remove(measureG.children[0]); $('measureTag').hidden = true; $('mres').textContent = '點模型表面上的兩個點，就會顯示距離。'; requestDraw(); }
+function pickPoint(e) {
+  const r = stage.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+  const hits = ray.intersectObjects(models.filter((m) => m.visible).map((m) => m.mesh)).filter((h) => cutPlane.distanceToPoint(h.point) >= -1e-6);
+  if (!hits.length) return;
+  if (mPts.length === 2) clearMeasure();
+  const p = hits[0].point.clone(); mPts.push(p);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.4, orbit.dist * 0.004), 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(cssVar('--accent')), depthTest: false }));
+  dot.renderOrder = 10; dot.position.copy(p); measureG.add(dot);
+  if (mPts.length === 2) {
+    const [a, b] = mPts, g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const ln = new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(cssVar('--accent')), depthTest: false })); ln.renderOrder = 10; measureG.add(ln);
+    const d = a.distanceTo(b), dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y), dz = Math.abs(b.z - a.z);
+    $('mres').innerHTML = `距離 <b>${fmt(d, 2)} mm</b><br>X ${fmt(dx, 2)}　Y ${fmt(dy, 2)}　Z ${fmt(dz, 2)}`;
+  } else $('mres').textContent = '再點第二個點。';
+  requestDraw();
+}
+function updateMeasureTag() {
+  const t = $('measureTag'); if (mPts.length !== 2) { t.hidden = true; return; }
+  const mid = mPts[0].clone().add(mPts[1]).multiplyScalar(0.5).project(camera);
+  t.hidden = false; t.textContent = fmt(mPts[0].distanceTo(mPts[1]), 2) + ' mm';
+  t.style.left = ((mid.x + 1) / 2 * stage.clientWidth) + 'px'; t.style.top = ((1 - mid.y) / 2 * stage.clientHeight) + 'px';
+}
+
+// ---------- 雷切檔（SVG / DXF） ----------
+// 雷切檔是平面線稿：封閉的切割線圍成零件、內圈是孔，用板厚擠成 3D 板件；雕刻線只畫在表面。
+const LMAT = {
+  basswood: { n: '椴木合板', d: 0.55, c: 0xdcb98e },
+  mdf: { n: 'MDF 密集板', d: 0.75, c: 0xa58058 },
+  acrylic: { n: '壓克力', d: 1.19, c: 0x8fcbe0, op: 0.6 },
+  card: { n: '瓦楞紙板', d: 0.2, c: 0xc9a46c },
+};
+const lset = { mat: 'basswood', thk: 3, spd: 10, pass: 1, eng: 60, cog: true };
+try { Object.assign(lset, JSON.parse(localStorage.getItem('stlv-laser') || '{}')); } catch {}
+function saveL() { try { localStorage.setItem('stlv-laser', JSON.stringify(lset)); } catch {} }
+const SNAP = 0.05;   // 線段端點相距 0.05 mm 以內就當成接上
+const RES = 0.4;     // 曲線取點間距（mm）
+const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+function decodeText(buf) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { return new TextDecoder('big5').decode(buf); }
+}
+
+// --- SVG ---
+const UNIT_MM = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6 };
+function lenMM(s, pxmm) {
+  const m = /^\s*([-+0-9.eE]+)\s*([a-z]*)\s*$/i.exec(s || ''); if (!m) return null;
+  const u = m[2].toLowerCase(), f = (u === '' || u === 'px') ? pxmm : UNIT_MM[u];
+  return f ? +m[1] * f : null;
+}
+function samplePath(sub, scale) {
+  const out = [], cs = sub.curves; if (!cs.length) return out;
+  out.push(cs[0].getPoint(0));
+  for (const c of cs) {
+    if (c.isLineCurve) { out.push(c.v2.clone()); continue; }
+    const n = Math.max(4, Math.min(256, Math.ceil(c.getLength() * scale / RES)));
+    for (let i = 1; i <= n; i++) out.push(c.getPoint(i / n));
+  }
+  return out;
+}
+function parseSVGLaser(text, unit) {
+  if (!THREE.SVGLoader) throw new Error('SVG 讀取元件沒載入，請檢查網路後重新整理頁面');
+  const NS = 'http://www.w3.org/2000/svg';
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  if (doc.querySelector('parsererror') || !doc.documentElement || doc.documentElement.localName !== 'svg') throw new Error('SVG 格式有錯，讀不進來');
+  const root = doc.documentElement, isAI = /Adobe Illustrator/i.test(text);
+  const pxmm = (unit === '72' || (unit === 'auto' && isAI)) ? 25.4 / 72 : 25.4 / 96;
+  const vb = (root.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+  const hasVB = vb.length === 4 && vb.every(Number.isFinite) && vb[2] > 0 && vb[3] > 0;
+  const wmm = lenMM(root.getAttribute('width'), pxmm), hmm = lenMM(root.getAttribute('height'), pxmm);
+  let sx, sy, how; const ox = hasVB ? vb[0] : 0, oy = hasVB ? vb[1] : 0;
+  if (unit === 'mm') { sx = sy = 1; how = '1 單位 = 1 mm'; }
+  else if (unit === '96' || unit === '72') { sx = sy = pxmm; how = unit + ' DPI'; }
+  else if (hasVB && wmm) { sx = wmm / vb[2]; sy = hmm ? hmm / vb[3] : sx; how = `依檔案標示：${fmt(wmm)} × ${fmt(hmm || vb[3] * sx)} mm`; }
+  else { sx = sy = pxmm; how = isAI ? '72 DPI（Illustrator 檔）' : '96 DPI（檔案沒標單位）'; }
+
+  // 把 <use> 展開成實際圖形（讀取元件不支援），拿掉不會被切的定義類元素
+  const byId = (id) => doc.querySelector(`[id="${id.replace(/["\\]/g, '\\$&')}"]`);
+  for (let k = 0; k < 6; k++) {
+    const uses = [...root.getElementsByTagNameNS(NS, 'use')].filter((u) => !u.closest('defs,symbol'));
+    if (!uses.length) break;
+    for (const u of uses) {
+      const href = u.getAttribute('href') || u.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || '';
+      const ref = href.startsWith('#') ? byId(href.slice(1)) : null;
+      const g = doc.createElementNS(NS, 'g');
+      for (const a of ['style', 'class', 'stroke', 'fill', 'stroke-width', 'opacity']) if (u.hasAttribute(a)) g.setAttribute(a, u.getAttribute(a));
+      const tx = parseFloat(u.getAttribute('x')) || 0, ty = parseFloat(u.getAttribute('y')) || 0;
+      const tr = (u.getAttribute('transform') || '') + (tx || ty ? ` translate(${tx},${ty})` : '');
+      if (tr.trim()) g.setAttribute('transform', tr.trim());
+      if (ref) {
+        const c = ref.cloneNode(true); c.removeAttribute('id');
+        if (c.localName === 'symbol') { while (c.firstChild) g.appendChild(c.firstChild); } else g.appendChild(c);
+      }
+      u.replaceWith(g);
+    }
+  }
+  // 圓角矩形改成精確的路徑（讀取元件的圓角是近似的）
+  for (const r of [...root.getElementsByTagNameNS(NS, 'rect')]) {
+    const f = (a) => parseFloat(r.getAttribute(a)) || 0, x = f('x'), y = f('y'), w = f('width'), h = f('height');
+    let rx = f('rx'), ry = f('ry'); if (!r.hasAttribute('rx')) rx = ry; if (!r.hasAttribute('ry')) ry = rx;
+    rx = Math.min(Math.abs(rx), w / 2); ry = Math.min(Math.abs(ry), h / 2);
+    const pth = doc.createElementNS(NS, 'path');
+    for (const a of [...r.attributes]) if (!['x', 'y', 'width', 'height', 'rx', 'ry'].includes(a.name)) pth.setAttribute(a.name, a.value);
+    pth.setAttribute('d', rx > 0 && ry > 0
+      ? `M${x + rx} ${y} H${x + w - rx} A${rx} ${ry} 0 0 1 ${x + w} ${y + ry} V${y + h - ry} A${rx} ${ry} 0 0 1 ${x + w - rx} ${y + h} H${x + rx} A${rx} ${ry} 0 0 1 ${x} ${y + h - ry} V${y + ry} A${rx} ${ry} 0 0 1 ${x + rx} ${y} Z`
+      : `M${x} ${y} H${x + w} V${y + h} H${x} Z`);
+    r.replaceWith(pth);
+  }
+  // CSS（Illustrator 會把 .cls-1{stroke:#f00} 放在 <defs><style>）：直接寫進各元素的 style
+  for (const st of [...root.getElementsByTagNameNS(NS, 'style')]) {
+    const css = (st.textContent || '').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const mm of css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      for (const sel of mm[1].split(',').map((x) => x.trim()).filter(Boolean)) {
+        try { root.querySelectorAll(sel).forEach((el) => el.setAttribute('style', mm[2].trim() + ';' + (el.getAttribute('style') || ''))); } catch {}
+      }
+    }
+    st.remove();
+  }
+  for (const sel of ['symbol', 'clipPath', 'mask', 'pattern', 'marker', 'metadata', 'title', 'desc', '[display="none"]', '[style*="display:none"]', '[style*="display: none"]'])
+    root.querySelectorAll(sel).forEach((e) => e.remove());
+  const live = (tag) => [...root.getElementsByTagNameNS(NS, tag)].filter((e) => !e.closest('defs')).length;
+  const warn = { text: live('text'), image: live('image') };
+  ['width', 'height', 'viewBox'].forEach((a) => root.removeAttribute(a));
+
+  const data = new THREE.SVGLoader().parse(new XMLSerializer().serializeToString(doc));
+  const T = (v) => [(v.x - ox) * sx, -(v.y - oy) * sy];   // SVG 的 y 朝下，翻成朝上
+  const paths = [], scale = Math.max(sx, sy);
+  for (const sp of data.paths) {
+    const st = sp.userData && sp.userData.style || {};
+    const hasStroke = st.stroke && st.stroke !== 'none' && st.strokeOpacity !== 0;
+    const hasFill = st.fill && st.fill !== 'none' && st.fillOpacity !== 0;
+    if (!hasStroke && !hasFill) continue;
+    let col = 0x222222; try { const c = new THREE.Color(); c.setStyle(hasStroke ? st.stroke : st.fill); col = c.getHex(); } catch {}
+    const layer = (hasStroke ? 'L' : 'F') + col.toString(16).padStart(6, '0');
+    for (const sub of sp.subPaths) {
+      const pts = samplePath(sub, scale); if (pts.length < 2) continue;
+      paths.push({ layer, color: col, fill: !hasStroke, pts: pts.map(T), closed: !!sub.autoClose });
+    }
+  }
+  return { paths, warn, how };
+}
+
+// --- DXF ---
+const ACI = [0x222222, 0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff, 0x222222, 0x808080, 0xc0c0c0];
+function arcPts(cx, cy, r, a0, sw, res) {
+  const n = Math.max(8, Math.min(720, Math.ceil(Math.abs(sw) * r / res))), o = [];
+  for (let i = 0; i <= n; i++) { const a = a0 + sw * i / n; o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  return o;
+}
+function bulgePts(vs, closed, res) {
+  const o = [[vs[0].x, vs[0].y]], n = vs.length;
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const a = vs[i], b = vs[(i + 1) % n];
+    if (a.b && Math.abs(a.b) > 1e-9) {
+      const dx = b.x - a.x, dy = b.y - a.y, c = Math.hypot(dx, dy);
+      if (c > 0) {
+        const th = 4 * Math.atan(a.b), r = c / (2 * Math.sin(th / 2)), h = r * Math.cos(th / 2);
+        const cx = (a.x + b.x) / 2 - dy / c * h, cy = (a.y + b.y) / 2 + dx / c * h;
+        const arc = arcPts(cx, cy, Math.abs(r), Math.atan2(a.y - cy, a.x - cx), th, res); arc.shift(); o.push(...arc); continue;
+      }
+    }
+    o.push([b.x, b.y]);
+  }
+  if (closed && o.length > 2) o.pop();
+  return o;
+}
+function bspline(p, P, U, W, res) {
+  const n = P.length, a = U[p], b = U[n]; let L = 0;
+  for (let i = 0; i + 1 < n; i++) L += d2(P[i], P[i + 1]);
+  const N = Math.max(16, Math.min(2000, Math.ceil(L / res))), out = [];
+  for (let s = 0; s <= N; s++) {
+    const t = s === N ? b - 1e-9 * (b - a) : a + (b - a) * s / N;
+    let k = p; while (k < n - 1 && U[k + 1] <= t) k++;
+    const d = []; for (let j = 0; j <= p; j++) { const i = j + k - p, w = W ? W[i] : 1; d.push([P[i][0] * w, P[i][1] * w, w]); }
+    for (let r = 1; r <= p; r++) for (let j = p; j >= r; j--) {
+      const i = j + k - p, den = U[i + p - r + 1] - U[i], al = den ? (t - U[i]) / den : 0;
+      for (let q = 0; q < 3; q++) d[j][q] = (1 - al) * d[j - 1][q] + al * d[j][q];
+    }
+    out.push([d[p][0] / d[p][2], d[p][1] / d[p][2]]);
+  }
+  return out;
+}
+function parseDXFLaser(text, unit) {
+  const Ls = text.split(/\r\n|\r|\n/), recs = []; let cur = null;
+  for (let i = 0; i + 1 < Ls.length; i += 2) {
+    const c = parseInt(Ls[i], 10); if (Number.isNaN(c)) { i--; continue; }
+    const v = Ls[i + 1].trim();
+    if (c === 0) { cur = { type: v, g: [] }; recs.push(cur); } else if (cur) cur.g.push([c, v]);
+  }
+  if (!recs.some((r) => r.type === 'SECTION')) throw new Error('這不是 DXF 檔，或檔案壞了');
+  const get = (r, c) => { for (const x of r.g) if (x[0] === c) return x[1]; return undefined; };
+  let sec = '', blk = null, poly = null, insunits = 0; const blocks = {}, ents = [], layerCol = {};
+  for (const r of recs) {
+    if (r.type === 'SECTION') {
+      sec = get(r, 2) || '';
+      if (sec === 'HEADER') for (let k = 0; k < r.g.length; k++) if (r.g[k][0] === 9 && r.g[k][1] === '$INSUNITS') { const nx = r.g.slice(k + 1).find((x) => x[0] === 70); if (nx) insunits = +nx[1]; }
+      continue;
+    }
+    if (r.type === 'ENDSEC') { sec = ''; continue; }
+    if (sec === 'TABLES') { if (r.type === 'LAYER') { const nm = get(r, 2), c = parseInt(get(r, 62), 10); if (nm != null) layerCol[nm] = Math.abs(c || 7); } continue; }
+    if (sec === 'BLOCKS') {
+      if (r.type === 'BLOCK') { blk = { name: get(r, 2), bx: +get(r, 10) || 0, by: +get(r, 20) || 0, ents: [] }; blocks[blk.name] = blk; continue; }
+      if (r.type === 'ENDBLK') { blk = null; continue; }
+    }
+    const target = sec === 'ENTITIES' ? ents : (sec === 'BLOCKS' && blk ? blk.ents : null);
+    if (!target) continue;
+    if (r.type === 'VERTEX' && poly) { poly.verts.push(r); continue; }
+    if (r.type === 'SEQEND') { poly = null; continue; }
+    if (r.type === 'POLYLINE') { r.verts = []; poly = r; }
+    target.push(r);
+  }
+  const UN = { 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6: 1000 }, UNAME = { 1: '英吋', 2: '英呎', 4: 'mm', 5: 'cm', 6: '公尺' };
+  let s, how;
+  if (unit === 'mm') { s = 1; how = '1 單位 = 1 mm'; } else if (unit === 'in') { s = 25.4; how = '1 單位 = 1 英吋'; }
+  else { s = UN[insunits] || 1; how = UN[insunits] ? `依檔案標示：${UNAME[insunits]}` : '檔案沒標單位，當成 mm'; }
+  const res = RES / s, paths = [], warn = { text: 0, hatch: 0, other: 0 };
+  function emit(r, pts, closed, tf, il) {
+    let lay = get(r, 8) || '0'; if (lay === '0' && il) lay = il;
+    let c = parseInt(get(r, 62), 10); if (!c || c === 256 || c === 0) c = layerCol[lay] || 7;
+    const color = ACI[Math.abs(c)] ?? 0x808080;
+    paths.push({ layer: lay, color, fill: false, pts: pts.map((p) => tf(p[0], p[1])), closed });
+  }
+  function doEnt(r, tf, depth, il) {
+    const n = (c, d = 0) => { const v = parseFloat(get(r, c)); return Number.isFinite(v) ? v : d; };
+    const tfo = n(230, 1) < 0 ? (x, y) => tf(-x, y) : tf;   // 法向量朝下的圖元要左右翻
+    switch (r.type) {
+      case 'LINE': emit(r, [[n(10), n(20)], [n(11), n(21)]], false, tf, il); break;
+      case 'LWPOLYLINE': {
+        const vs = []; for (const [c, v] of r.g) { if (c === 10) vs.push({ x: +v, y: 0, b: 0 }); else if (c === 20 && vs.length) vs[vs.length - 1].y = +v; else if (c === 42 && vs.length) vs[vs.length - 1].b = +v; }
+        if (vs.length > 1) { const cl = (n(70) & 1) === 1; emit(r, bulgePts(vs, cl, res), cl, tfo, il); } break;
+      }
+      case 'POLYLINE': {
+        const vs = (r.verts || []).filter((v) => !((parseInt(get(v, 70), 10) || 0) & 16)).map((v) => ({ x: +get(v, 10) || 0, y: +get(v, 20) || 0, b: +get(v, 42) || 0 }));
+        if (vs.length > 1) { const cl = (n(70) & 1) === 1; emit(r, bulgePts(vs, cl, res), cl, tfo, il); } break;
+      }
+      case 'CIRCLE': { const p = arcPts(n(10), n(20), n(40), 0, Math.PI * 2, res); p.pop(); emit(r, p, true, tfo, il); break; }
+      case 'ARC': { const a0 = n(50) * Math.PI / 180; let sw = n(51) * Math.PI / 180 - a0; while (sw <= 0) sw += Math.PI * 2; emit(r, arcPts(n(10), n(20), n(40), a0, sw, res), false, tfo, il); break; }
+      case 'ELLIPSE': {
+        const cx = n(10), cy = n(20), mx = n(11), my = n(21), k = n(40, 1), t0 = n(41, 0); let sw = n(42, Math.PI * 2) - t0; while (sw <= 0) sw += Math.PI * 2;
+        const full = Math.abs(sw - Math.PI * 2) < 1e-6, N = Math.max(16, Math.min(720, Math.ceil(sw * Math.hypot(mx, my) / res))), p = [];
+        for (let i = 0; i <= N; i++) { const t = t0 + sw * i / N; p.push([cx + mx * Math.cos(t) - k * my * Math.sin(t), cy + my * Math.cos(t) + k * mx * Math.sin(t)]); }
+        if (full) p.pop(); emit(r, p, full, tfo, il); break;
+      }
+      case 'SPLINE': {
+        const deg = n(71, 3) | 0, knots = [], cps = [], fits = [], w = [];
+        for (const [c, v] of r.g) {
+          if (c === 40) knots.push(+v); else if (c === 10) cps.push([+v, 0]); else if (c === 20 && cps.length) cps[cps.length - 1][1] = +v;
+          else if (c === 41) w.push(+v); else if (c === 11) fits.push([+v, 0]); else if (c === 21 && fits.length) fits[fits.length - 1][1] = +v;
+        }
+        const cl = (n(70) & 1) === 1;
+        const p = (cps.length > deg && knots.length === cps.length + deg + 1) ? bspline(deg, cps, knots, w.length === cps.length ? w : null, res) : (fits.length > 1 ? fits : cps);
+        if (p.length > 1) { if (cl && d2(p[0], p[p.length - 1]) < 1e-9) p.pop(); emit(r, p, cl, tf, il); } break;
+      }
+      case 'INSERT': {
+        const b = blocks[get(r, 2)]; if (!b || depth > 8) break;
+        const ix = n(10), iy = n(20), sx = n(41, 1), sy = n(42, 1), rot = n(50) * Math.PI / 180, cs = Math.cos(rot), sn = Math.sin(rot);
+        const cols = Math.max(1, n(70, 1) | 0), rows = Math.max(1, n(71, 1) | 0), dc = n(44), dr = n(45), lay = get(r, 8) || il;
+        for (let ri = 0; ri < rows; ri++) for (let ci = 0; ci < cols; ci++) {
+          const t2 = (x, y) => { const lx = (x - b.bx) * sx + ci * dc, ly = (y - b.by) * sy + ri * dr; return tfo(ix + lx * cs - ly * sn, iy + lx * sn + ly * cs); };
+          for (const e of b.ents) doEnt(e, t2, depth + 1, lay);
+        }
+        break;
+      }
+      case 'TEXT': case 'MTEXT': warn.text++; break;
+      case 'HATCH': case 'SOLID': warn.hatch++; break;
+      case 'POINT': case 'DIMENSION': case 'VIEWPORT': case 'ATTDEF': case 'ATTRIB': case 'SEQEND': case 'VERTEX': break;
+      default: warn.other++;
+    }
+  }
+  for (const e of ents) doEnt(e, (x, y) => [x * s, y * s], 0, null);
+  return { paths, warn, how };
+}
+
+// --- 幾何小工具 ---
+function normPoly(p) {
+  const q = [p.pts[0]];
+  for (let i = 1; i < p.pts.length; i++) if (d2(p.pts[i], q[q.length - 1]) > 1e-6) q.push(p.pts[i]);
+  let closed = p.closed;
+  if (q.length > 2 && d2(q[0], q[q.length - 1]) <= SNAP) { q.pop(); closed = true; }
+  if (q.length < 2) return null;
+  return { pts: q, closed: closed && q.length > 2 };
+}
+// 把首尾相接的開放線段串成一條（很多 DXF 的外框是一段一段 LINE 畫的）
+function chainPolys(list) {
+  const out = list.filter((p) => p.closed), open = list.filter((p) => !p.closed), used = new Array(open.length).fill(false);
+  const cell = (p) => [Math.round(p[0] / SNAP), Math.round(p[1] / SNAP)], H = new Map();
+  const add = (p, i, e) => { const [x, y] = cell(p), k = x + ',' + y; (H.get(k) || H.set(k, []).get(k)).push([i, e]); };
+  open.forEach((p, i) => { add(p.pts[0], i, 0); add(p.pts[p.pts.length - 1], i, 1); });
+  const find = (pt) => {
+    const [x, y] = cell(pt);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const [i, e] of H.get((x + dx) + ',' + (y + dy)) || []) {
+      if (used[i]) continue; const q = open[i].pts, ep = e ? q[q.length - 1] : q[0];
+      if (d2(ep, pt) <= SNAP) return [i, e];
+    }
+    return null;
+  };
+  for (let i = 0; i < open.length; i++) {
+    if (used[i]) continue; used[i] = true; let ch = open[i].pts.slice(), closed = false;
+    for (let side = 0; side < 2 && !closed; side++) {
+      for (;;) {
+        if (ch.length > 2 && d2(ch[0], ch[ch.length - 1]) <= SNAP) { closed = true; break; }
+        const f = find(side ? ch[0] : ch[ch.length - 1]); if (!f) break;
+        used[f[0]] = true; let q = open[f[0]].pts.slice();
+        if (side === 0) { if (f[1] === 1) q.reverse(); ch = ch.concat(q.slice(1)); }
+        else { if (f[1] === 0) q.reverse(); ch = q.slice(0, -1).concat(ch); }
+      }
+    }
+    if (closed) ch.pop();
+    out.push({ pts: ch, closed: closed && ch.length > 2 });
+  }
+  return out;
+}
+const polyLen = (q) => { let L = 0; const p = q.pts; for (let i = 1; i < p.length; i++) L += d2(p[i - 1], p[i]); if (q.closed) L += d2(p[p.length - 1], p[0]); return L; };
+function areaOf(p) { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] * p[i][1] - p[i][0] * p[j][1]); return a / 2; }
+function centroidOf(p) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const f = p[j][0] * p[i][1] - p[i][0] * p[j][1]; a += f; cx += (p[j][0] + p[i][0]) * f; cy += (p[j][1] + p[i][1]) * f; }
+  return a ? [cx / (3 * a), cy / (3 * a)] : p[0];
+}
+function bbOf(p) { let a = 1e18, b = 1e18, c = -1e18, d = -1e18; for (const [x, y] of p) { if (x < a) a = x; if (y < b) b = y; if (x > c) c = x; if (y > d) d = y; } return [a, b, c, d]; }
+const bbIn = (i, o) => i[0] >= o[0] - SNAP && i[1] >= o[1] - SNAP && i[2] <= o[2] + SNAP && i[3] <= o[3] + SNAP;
+function pip(pt, poly) {
+  let ins = false; const [x, y] = pt;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+}
+function disposeGroup(g) {
+  while (g.children.length) {
+    const c = g.children[g.children.length - 1]; g.remove(c);
+    if (c.geometry) c.geometry.dispose();
+    if (c.material && c.material !== matCut) c.material.dispose();
+  }
+}
+
+// --- 建模 ---
+function buildLaser(m) {
+  const L = m.laser, P = L.fmt === 'svg' ? parseSVGLaser(L.text, L.unit) : parseDXFLaser(L.text, L.unit);
+  if (!P.paths.length) throw new Error('檔案裡沒有讀到任何線條' + (P.warn.text ? '（文字要先轉外框）' : ''));
+  L.how = P.how; L.warn = P.warn;
+  const lay = {}, byLayer = {};
+  for (const p of P.paths) {
+    if (!lay[p.layer]) lay[p.layer] = { key: p.layer, color: p.color, fill: p.fill, len: 0, n: 0 };
+    (byLayer[p.layer] || (byLayer[p.layer] = [])).push(p);
+  }
+  // 預設：填色＝雕刻；有紅線時藍線當雕刻（常見的紅切藍雕慣例）；DXF 圖層名有「雕／刻／engrave」也當雕刻
+  const rgb = (c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+  const isRed = (c) => { const [r, g, b] = rgb(c); return r > 180 && g < 90 && b < 90; };
+  const isBlue = (c) => { const [r, g, b] = rgb(c); return b > 180 && r < 90 && g < 90; };
+  const hasRed = Object.values(lay).some((l) => !l.fill && isRed(l.color));
+  for (const k in lay) if (!L.mode[k]) {
+    const l = lay[k];
+    L.mode[k] = (l.fill || (hasRed && isBlue(l.color)) || /雕|刻|engrav|etch|mark|score/i.test(L.fmt === 'dxf' ? k : '')) ? 'eng' : 'cut';
+  }
+  const polys = [];
+  for (const k in byLayer) for (const q of chainPolys(byLayer[k].map(normPoly).filter(Boolean))) { q.layer = k; polys.push(q); lay[k].len += polyLen(q); lay[k].n++; }
+  L.layers = Object.values(lay).sort((a, b) => b.len - a.len);
+
+  const T = Math.max(0.2, +lset.thk || 3);
+  const cut = polys.filter((q) => L.mode[q.layer] === 'cut'), eng = polys.filter((q) => L.mode[q.layer] === 'eng');
+  const closed = [];
+  for (const q of cut) if (q.closed && q.pts.length >= 3) { q.A = areaOf(q.pts); q.bb = bbOf(q.pts); if (Math.abs(q.A) > 1e-3) closed.push(q); }
+  closed.sort((a, b) => Math.abs(b.A) - Math.abs(a.A));
+  // 一模一樣的外框畫了兩次：只留一個，不然會被當成「孔裡的零件」
+  const uniq = [];
+  for (const q of closed) {
+    const twin = uniq.find((u) => Math.abs(Math.abs(u.A) - Math.abs(q.A)) <= Math.abs(q.A) * 1e-3 && q.bb.every((v, i) => Math.abs(v - u.bb[i]) <= SNAP * 2));
+    if (!twin) uniq.push(q);
+  }
+  for (let i = 0; i < uniq.length; i++) {
+    const c = uniq[i], a = c.pts[0], b = c.pts[1], probe = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    c.parent = null; c.depth = 0;
+    for (let j = i - 1; j >= 0; j--) { const o = uniq[j]; if (bbIn(c.bb, o.bb) && pip(probe, o.pts)) { c.parent = o; c.depth = o.depth + 1; break; } }
+  }
+  const pieces = uniq.filter((c) => c.depth % 2 === 0), geos = [];
+  let area = 0, mx = 0, my = 0, holes = 0;
+  const V = (p) => new THREE.Vector2(p[0], p[1]);
+  for (const pc of pieces) {
+    // 外框逆時針、孔順時針，擠出時側面才會朝外
+    const orient = (pts, ccw) => (areaOf(pts) > 0) === ccw ? pts : pts.slice().reverse();
+    const hs = uniq.filter((c) => c.parent === pc), shape = new THREE.Shape(orient(pc.pts, true).map(V));
+    for (const h of hs) shape.holes.push(new THREE.Path(orient(h.pts, false).map(V)));
+    holes += hs.length;
+    try { geos.push(new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false, steps: 1, curveSegments: 1 })); } catch {}
+    for (const c of [pc, ...hs]) { const s = c === pc ? 1 : -1, a = Math.abs(c.A), cc = centroidOf(c.pts); area += s * a; mx += s * a * cc[0]; my += s * a * cc[1]; }
+  }
+  // 合併成一個網格（量測、剖面都用它）
+  let total = 0; const parts = geos.map((g) => { const ng = g.index ? g.toNonIndexed() : g; total += ng.getAttribute('position').count * 3; return [g, ng]; });
+  const pos = new Float32Array(total); let o = 0;
+  for (const [g, ng] of parts) { const a = ng.getAttribute('position').array; pos.set(a, o); o += a.length; g.dispose(); if (ng !== g) ng.dispose(); }
+
+  // 重疊線段（會被切兩次）
+  const seen = new Set(), rk = (p) => Math.round(p[0] / 0.02) + ',' + Math.round(p[1] / 0.02); let dup = 0;
+  for (const q of cut) {
+    const p = q.pts, n = q.closed ? p.length : p.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = p[i], b = p[(i + 1) % p.length], ka = rk(a), kb = rk(b); if (ka === kb) continue;
+      const k = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+      if (seen.has(k)) dup += d2(a, b); else seen.add(k);
+    }
+  }
+
+  // --- 重建 3D 物件 ---
+  disposeGroup(m.g);
+  const mi = LMAT[lset.mat] || LMAT.basswood; m.color = mi.c;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  if (total) geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ color: mi.c, roughness: 0.85, metalness: 0, side: THREE.FrontSide, clippingPlanes: [cutPlane], transparent: !!mi.op, opacity: mi.op || 1 });
+  const mesh = new THREE.Mesh(geo, mat), back = new THREE.Mesh(geo, matCut); m.g.add(mesh, back);
+  // 半透明板材（壓克力）平常不畫背面的紅色剖面，免得透出來；拉剖面時才顯示
+  m.backMesh = mi.op ? back : null; if (mi.op) back.visible = +$('cut').value < 100;
+  let edges = null;
+  if (total) { try { edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: 0x0b1015, transparent: true, opacity: 0.3, clippingPlanes: [cutPlane] })); edges.visible = $('edges').checked; m.g.add(edges); } catch {} }
+  // 線稿：依圖層顏色畫在板子表面
+  const zTop = T + 0.03, lineArr = {};
+  for (const q of [...cut, ...eng]) {
+    const arr = lineArr[lay[q.layer].color] || (lineArr[lay[q.layer].color] = []), p = q.pts, n = q.closed ? p.length : p.length - 1;
+    for (let i = 0; i < n; i++) { const a = p[i], b = p[(i + 1) % p.length]; arr.push(a[0], a[1], zTop, b[0], b[1], zTop); }
+  }
+  for (const c in lineArr) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(lineArr[c], 3));
+    m.g.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: +c, clippingPlanes: [cutPlane] })));
+  }
+  // 範圍
+  const shown = [...cut, ...eng]; let bb = [1e18, 1e18, -1e18, -1e18];
+  for (const q of (shown.length ? shown : polys)) { const b = bbOf(q.pts); bb = [Math.min(bb[0], b[0]), Math.min(bb[1], b[1]), Math.max(bb[2], b[2]), Math.max(bb[3], b[3])]; }
+  const diag = Math.hypot(bb[2] - bb[0], bb[3] - bb[1]) || 10;
+  // 沒閉合的斷口：紅點
+  const openCut = cut.filter((q) => !q.closed), rDot = Math.max(0.5, diag * 0.006);
+  if (openCut.length) {
+    const dg = new THREE.SphereGeometry(rDot, 12, 8), dm = new THREE.MeshBasicMaterial({ color: 0xe02424, depthTest: false });
+    for (const q of openCut.slice(0, 400)) for (const p of [q.pts[0], q.pts[q.pts.length - 1]]) { const s = new THREE.Mesh(dg, dm); s.position.set(p[0], p[1], zTop); s.renderOrder = 9; m.g.add(s); }
+  }
+  // 重心標記
+  let cog = null; m.cogObj = null;
+  if (area > 1e-3) {
+    cog = [mx / area, my / area];
+    const cg = new THREE.Group(), cm = new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: false }), cm2 = new THREE.MeshBasicMaterial({ color: 0xffd23f, depthTest: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(diag * 0.012, diag * 0.02, 32), cm); ring.renderOrder = 11;
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(diag * 0.012, 32), cm2); dot.renderOrder = 12;
+    const lm = new THREE.LineBasicMaterial({ color: 0x111111, depthTest: false }), r = diag * 0.04;
+    const cross = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-r, 0, 0), new THREE.Vector3(r, 0, 0), new THREE.Vector3(0, -r, 0), new THREE.Vector3(0, r, 0)]), lm); cross.renderOrder = 11;
+    cg.add(cross, ring, dot); cg.position.set(cog[0], cog[1], zTop + 0.02); cg.visible = !!lset.cog; m.g.add(cg); m.cogObj = cg;
+  }
+
+  m.geo = geo; m.mesh = mesh; m.edges = edges; m.pos = pos; m.stats = null;
+  m.bbox = new THREE.Box3(new THREE.Vector3(bb[0], bb[1], 0), new THREE.Vector3(bb[2], bb[3], T));
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  m.lstats = {
+    w: bb[2] - bb[0], h: bb[3] - bb[1], T, minx: bb[0], maxy: bb[3],
+    pieces: pieces.length, holes, area, cog,
+    cutLen: cut.reduce((s, q) => s + polyLen(q), 0), engLen: eng.filter((q) => !lay[q.layer].fill).reduce((s, q) => s + polyLen(q), 0),
+    engFill: eng.filter((q) => lay[q.layer].fill).length, open: openCut.length, dup, nCut: cut.length,
+  };
+}
+function addLaserModel(name, fmt, text) {
+  const m = { id: nextId, name, kind: 'laser', g: new THREE.Group(), visible: true, laser: { fmt, text, unit: 'auto', mode: {} }, color: 0 };
+  buildLaser(m);
+  nextId++; world.add(m.g); models.push(m); selId = m.id;
+  if (!$('bedSize').value.includes('x')) { let b = '600x400'; try { b = localStorage.getItem('stlv-lbed') || b; } catch {} $('bedSize').value = b; if (!$('bedSize').value) $('bedSize').value = '600x400'; buildBed(); }
+  orbit.theta = -Math.PI / 2; orbit.phi = 1.1;
+  layout(); renderFiles(); renderInfo(); fitView();
+  return m;
+}
+function rebuildLaser(list, refit) {
+  for (const m of list) { try { buildLaser(m); m.g.visible = m.visible; } catch (e) { showError(m.name + '：' + e.message); } }
+  clearMeasure(); layout(); renderFiles(); renderInfo();
+  if (refit) fitView(); else { updateCutRange(); requestDraw(); }
+}
+const laserModels = () => models.filter((m) => m.kind === 'laser');
+
+// --- 雷切面板 ---
+const CNAME = { ff0000: '紅', '0000ff': '藍', '000000': '黑', '222222': '黑', '00ff00': '綠', ffff00: '黃', ff00ff: '洋紅', '00ffff': '青', '808080': '灰' };
+function layerLabel(m, ly) {
+  if (m.laser.fmt === 'dxf') return '圖層 ' + ly.key;
+  const h = ly.color.toString(16).padStart(6, '0');
+  return (ly.fill ? '填色 ' : '線 ') + (CNAME[h] ? CNAME[h] + ' ' : '') + '#' + h.toUpperCase();
+}
+function fmtTime(s) { const t = Math.round(s); if (t < 60) return t + ' 秒'; const h = Math.floor(t / 3600), mi = Math.floor(t / 60) % 60, se = t % 60; return (h ? h + ' 小時 ' : '') + mi + ' 分 ' + String(se).padStart(2, '0') + ' 秒'; }
+function renderLaserInfo(m) {
+  const S = m.lstats, L = m.laser, mi = LMAT[lset.mat] || LMAT.basswood, [bw, bh] = parseBed($('bedSize').value);
+  $('infoTitle').textContent = '尺寸｜' + m.name;
+  const fit = (S.w <= bw && S.h <= bh) ? '<span class="pill ok">放得下</span>' : (S.h <= bw && S.w <= bh ? '<span class="pill warn">轉 90° 才放得下</span>' : `<span class="pill bad">超出 ${bw} × ${bh}</span>`);
+  const tSec = S.cutLen * (+lset.pass || 1) / Math.max(0.1, +lset.spd || 10) + S.engLen / Math.max(0.1, +lset.eng || 60);
+  const wt = S.area * S.T / 1000 * mi.d;
+  const ck = [];
+  if (S.nCut && !S.pieces) ck.push('<span class="pill bad">切割線沒圍成封閉形狀，切不出零件</span>');
+  if (S.open) ck.push(`<span class="pill bad">${S.open} 條切割線沒閉合（紅點是斷口）</span>`);
+  else if (S.pieces) ck.push('<span class="pill ok">切割外框都閉合</span>');
+  if (S.dup > 0.5) ck.push(`<span class="pill warn">重疊線約 ${fmt(S.dup, 0)} mm，會切兩次</span>`);
+  if (L.warn.text) ck.push(`<span class="pill warn">${L.warn.text} 個文字沒轉外框，沒讀到</span>`);
+  if (L.warn.image) ck.push(`<span class="pill warn">${L.warn.image} 張點陣圖沒顯示</span>`);
+  if (L.warn.hatch) ck.push(`<span class="pill warn">${L.warn.hatch} 個填滿區塊沒讀到</span>`);
+  if (L.warn.other) ck.push(`<span class="pill warn">略過 ${L.warn.other} 個不支援的物件</span>`);
+  $('info').innerHTML = `
+    <dt>長 X</dt><dd>${fmt(S.w)}<span class="unit">mm</span></dd>
+    <dt>寬 Y</dt><dd>${fmt(S.h)}<span class="unit">mm</span></dd>
+    <dt>板厚</dt><dd>${fmt(S.T)}<span class="unit">mm</span></dd>
+    <dt>工作範圍</dt><dd>${fit}</dd>
+    <dt>零件</dt><dd>${S.pieces}<span class="unit">片</span>${S.holes ? `　${S.holes}<span class="unit">個孔</span>` : ''}</dd>
+    <dt>切割總長</dt><dd>${fmt(S.cutLen / 1000, 2)}<span class="unit">m</span></dd>
+    ${S.engLen ? `<dt>雕刻線長</dt><dd>${fmt(S.engLen / 1000, 2)}<span class="unit">m</span></dd>` : ''}
+    <dt>預估時間</dt><dd><span class="big">${fmtTime(tSec)}</span></dd>
+    <dt>用料面積</dt><dd>${fmt(S.area / 100, 1)}<span class="unit">cm²</span></dd>
+    <dt>估計重量</dt><dd>${fmt(wt, 1)}<span class="unit">g</span></dd>
+    ${S.cog ? `<dt>重心</dt><dd>距左 ${fmt(S.cog[0] - S.minx)}・距上 ${fmt(S.maxy - S.cog[1])}<span class="unit">mm</span></dd>` : ''}
+    <dt>檢查</dt><dd><div class="checks">${ck.join('') || '<span class="pill ok">沒發現問題</span>'}</div></dd>`;
+  // 單位
+  const u = $('lUnit'), opts = L.fmt === 'svg' ? [['auto', '自動'], ['mm', '1 單位 = 1 mm'], ['96', '96 DPI（Inkscape）'], ['72', '72 DPI（Illustrator）']] : [['auto', '自動'], ['mm', 'mm'], ['in', '英吋']];
+  u.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); u.value = L.unit;
+  $('lHow').textContent = '目前：' + L.how + '。尺寸不對就換單位，或用量測核對。';
+  // 圖層
+  const box = $('layers'); box.innerHTML = '';
+  for (const ly of L.layers) {
+    const d = document.createElement('div'); d.className = 'layer';
+    const engNote = ly.fill ? '填色雕刻，不算時間' : `${fmt(ly.len / 1000, 2)} m`;
+    d.innerHTML = `<span class="sw" style="background:${hex(ly.color)}"></span><span class="nm">${esc(layerLabel(m, ly))}<small>${ly.n} 條・${engNote}</small></span>
+      <select aria-label="這個圖層要做什麼"><option value="cut">切割</option><option value="eng">雕刻</option><option value="skip">不用</option></select>`;
+    const s = d.querySelector('select'); s.value = L.mode[ly.key];
+    s.onchange = () => { L.mode[ly.key] = s.value; rebuildLaser([m], false); };
+    box.appendChild(d);
+  }
+  $('lMat').value = lset.mat; $('lThk').value = lset.thk; $('lSpd').value = lset.spd; $('lPass').value = lset.pass; $('lEng').value = lset.eng; $('lCog').checked = !!lset.cog;
+}
+$('lMat').onchange = () => { lset.mat = $('lMat').value; saveL(); rebuildLaser(laserModels(), false); };
+$('lThk').onchange = () => { lset.thk = Math.max(0.2, Math.min(50, +$('lThk').value || 3)); saveL(); rebuildLaser(laserModels(), true); };
+for (const [id, k, lo] of [['lSpd', 'spd', 0.1], ['lPass', 'pass', 1], ['lEng', 'eng', 0.1]])
+  $(id).oninput = () => { const v = +$(id).value; if (v >= lo) { lset[k] = v; saveL(); renderInfo(); } };
+$('lCog').onchange = () => { lset.cog = $('lCog').checked; saveL(); for (const m of laserModels()) if (m.cogObj) m.cogObj.visible = lset.cog; requestDraw(); };
+$('lUnit').onchange = () => { const m = models.find((x) => x.id === selId); if (!m || m.kind !== 'laser') return; m.laser.unit = $('lUnit').value; rebuildLaser([m], true); };
+
+// 範例：雷切手機支架（3 mm 板，側板 x2＋橫桿 x2，十字卡榫插接，插槽 2.9 mm 已扣切縫）
+const SAMPLE_SVG = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"192mm\" height=\"118mm\" viewBox=\"0 0 192 118\">\n<!-- © 2026 新北市立中正國中何政學教師｜授權 CC BY-NC-SA 4.0｜雷切手機支架：3 mm 椴木合板，側板 x2、橫桿 x2，十字卡榫插接；插槽 2.9 mm（3 mm 扣切縫）。紅＝切割，藍＝雕刻名牌框 -->\n<g fill=\"none\" stroke=\"#ff0000\" stroke-width=\"0.1\"><path d=\"M4 97 L32.55 97 L32.55 92 L35.45 92 L35.45 97 L80.55 97 L80.55 92 L83.45 92 L83.45 97 L94 97 L94 87 L54.8 37 L69.55 5.38 L62.3 2 L22.66 87 L9 87 L9 79 L4 79 Z\"/><path d=\"M98 97 L126.55 97 L126.55 92 L129.45 92 L129.45 97 L174.55 97 L174.55 92 L177.45 92 L177.45 97 L188 97 L188 87 L148.8 37 L163.55 5.38 L156.3 2 L116.66 87 L103 87 L103 79 L98 79 Z\"/><path d=\"M4 114 L80 114 L80 104 L73.45 104 L73.45 109 L70.55 109 L70.55 104 L13.45 104 L13.45 109 L10.55 109 L10.55 104 L4 104 Z\"/><path d=\"M84 114 L160 114 L160 104 L153.45 104 L153.45 109 L150.55 109 L150.55 104 L93.45 104 L93.45 109 L90.55 109 L90.55 104 L84 104 Z\"/></g>\n<g fill=\"none\" stroke=\"#0000ff\" stroke-width=\"0.1\"><rect x=\"44\" y=\"72\" width=\"32\" height=\"12\" rx=\"2\"/></g></svg>";
+// 兩個範例互相替換，不疊在一起
+let laserSample = null;
+const dropSample = (m) => { if (m && models.includes(m)) removeModel(m.id); };
+$('lSample').onclick = () => {
+  if (laserSample && models.includes(laserSample)) { selId = laserSample.id; renderFiles(); renderInfo(); return; }
+  try { laserSample = addLaserModel('範例｜雷切手機支架（3mm 板）.svg', 'svg', SAMPLE_SVG); dropSample(sampleModel); sampleModel = null; }
+  catch (e) { showError(e.message); }
+};
+$('sSample').onclick = () => {
+  if (sampleModel && models.includes(sampleModel)) { selId = sampleModel.id; renderFiles(); renderInfo(); return; }
+  sampleModel = addModel('範例｜手機支架.stl', samplePhoneStand()); dropSample(laserSample); laserSample = null;
+  orbit.theta = -Math.PI * 0.62; orbit.phi = 0.42; fitView();
+};
+
+// 開檔
+async function openFiles(list) {
+  for (const f of list) {
+    try {
+      const buf = await f.arrayBuffer();
+      if (/\.zip$/i.test(f.name)) { for (const z of await unzip(buf)) { try { openOne(z.name, z.buf); } catch (err) { showError(z.name + '：' + err.message); } } }
+      else openOne(f.name, buf);
+    } catch (err) { $('mres').textContent = ''; showError(f.name + '：' + err.message); }
+  }
+  if (sampleModel && models.length > 1 && models.includes(sampleModel)) removeModel(sampleModel.id), sampleModel = null;
+  if (laserSample && models.length > 1 && models.includes(laserSample)) removeModel(laserSample.id), laserSample = null;
+}
+function openOne(name, buf) {
+  if (/\.stl$/i.test(name)) addModel(name, parseSTL(buf));
+  else if (/\.svg$/i.test(name)) addLaserModel(name, 'svg', decodeText(buf));
+  else if (/\.dxf$/i.test(name)) addLaserModel(name, 'dxf', decodeText(buf));
+  else throw new Error('只能開 STL、SVG、DXF，或裝這些檔的 zip');
+}
+function showError(msg) { const box = $('files'); const d = document.createElement('div'); d.className = 'pill bad'; d.style.whiteSpace = 'normal'; d.textContent = msg; box.prepend(d); }
+$('openBtn').onclick = () => $('fileIn').click();
+$('fileIn').onchange = (e) => { openFiles([...e.target.files]); e.target.value = ''; };
+['dragenter', 'dragover'].forEach((t) => stage.addEventListener(t, (e) => { e.preventDefault(); stage.classList.add('dragging'); }));
+['dragleave', 'drop'].forEach((t) => stage.addEventListener(t, (e) => { e.preventDefault(); if (t === 'drop' || e.target === $('drop')) stage.classList.remove('dragging'); }));
+stage.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.files.length) openFiles([...e.dataTransfer.files]); });
+document.addEventListener('dragover', (e) => e.preventDefault()); document.addEventListener('drop', (e) => { e.preventDefault(); if (!stage.contains(e.target) && e.dataTransfer.files.length) openFiles([...e.dataTransfer.files]); });
+
+// 範例
+let sampleModel = null;
+// 範例：手機支架（側面輪廓擠出 70 mm 寬）
+function samplePhoneStand() {
+  const P = (x, z) => new THREE.Vector2(x, z);
+  const sh = new THREE.Shape([P(0, 0), P(85, 0), P(85, 5), P(41.5, 50), P(61.5, 92.9), P(57, 95), P(15, 5), P(5, 5), P(5, 14), P(0, 14)]);
+  sh.holes.push(new THREE.Path([P(24, 8), P(36.5, 37), P(72, 8)]));   // 鏤空省料
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 70, bevelEnabled: false, curveSegments: 1 }).toNonIndexed();
+  const a = g.getAttribute('position').array, pos = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i += 3) { pos[i] = a[i]; pos[i + 1] = 35 - a[i + 2]; pos[i + 2] = a[i + 1]; }   // 輪廓立起來、寬度往 Y
+  g.dispose(); return pos;
+}
+function loadSample() {
+  try { if (!models.length) { sampleModel = addModel('範例｜手機支架.stl', samplePhoneStand()); orbit.theta = -Math.PI * 0.62; orbit.phi = 0.42; fitView(); } }
+  catch (e) { renderFiles(); }
+}
+
+applyTheme(); renderFiles(); renderInfo(); resize(); loadSample();
+window.__stlv = { models, camera, world, THREE };
+</script>
+
+</body></html>
