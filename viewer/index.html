@@ -43,6 +43,8 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;
 #views .btn{padding:3px 9px;font-size:12px}
 #drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--accent) 18%,transparent);border:3px dashed var(--accent);border-radius:12px;font-size:20px;font-weight:700;color:var(--fg)}
 #stage.dragging #drop{display:flex}
+.dimTag{position:absolute;padding:1px 6px;border-radius:4px;background:color-mix(in srgb,var(--bed) 82%,transparent);color:var(--accent);font-family:var(--f-num);font-size:12px;font-weight:600;pointer-events:none;transform:translate(-50%,-50%);white-space:nowrap}
+#lQuick .btn{padding:3px 8px;font-size:12px}
 #measureTag{position:absolute;padding:3px 8px;border-radius:6px;background:var(--fg);color:var(--panel);font-family:var(--f-num);font-size:13px;pointer-events:none;transform:translate(-50%,-130%);white-space:nowrap}
 aside{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;min-width:0;display:flex;flex-direction:column;gap:16px}
 section h2{font-size:12px;letter-spacing:.08em;color:var(--mute);margin:0 0 8px;font-weight:700}
@@ -106,6 +108,7 @@ h3.sub{font-size:12px;color:var(--mute);margin:12px 0 2px;font-weight:700}
     </div>
     <div id="hint">左鍵拖曳旋轉　右鍵或兩指拖曳平移　滾輪或兩指縮放　可以直接把檔案拖進來</div>
     <div id="measureTag" hidden></div>
+    <div id="dimTags"></div>
     <div id="drop">放開就開啟</div>
   </div>
   <aside>
@@ -126,9 +129,21 @@ h3.sub{font-size:12px;color:var(--mute);margin:12px 0 2px;font-weight:700}
       <label class="chk">雕刻線速度（mm/s）<input type="number" id="lEng" value="60" step="5" min="0.1"></label>
       <label class="chk">檔案單位<select id="lUnit"></select></label>
       <p class="note" id="lHow"></p>
+      <h3 class="sub">尺寸與比例</h3>
+      <label class="chk">顯示尺寸標註<input type="checkbox" id="lDim" checked></label>
+      <label class="chk">縮放比例（%）<input type="number" id="lScale" value="100" step="0.1" min="0.1" max="100000"></label>
+      <label class="chk">或指定寬度（mm）<input type="number" id="lTargetW" step="0.1" min="0.1" placeholder="—"></label>
+      <div class="row" id="lQuick" style="gap:4px">
+        <button class="btn" data-s="100">原尺寸</button><button class="btn" data-s="133.3333">×1.333</button><button class="btn" data-s="75">×0.75</button><button class="btn" data-s="2540">×25.4</button>
+      </div>
+      <p class="note" id="lScaleNote"></p>
       <h3 class="sub">圖層（依線條顏色分）</h3>
       <div class="layers" id="layers"></div>
       <label class="chk" style="margin-top:6px">顯示重心<input type="checkbox" id="lCog" checked></label>
+      <h3 class="sub">匯出上機用檔案（單位 mm）</h3>
+      <div class="row"><button class="btn" id="lExpDxf">下載 DXF</button><button class="btn" id="lExpSvg">下載 SVG</button></div>
+      <label class="chk">附 50 mm 校正方塊<input type="checkbox" id="lCal"></label>
+      <p class="note">依上面的圖層設定輸出：紅＝切割、藍＝雕刻、黑＝填色雕刻，設成「不用」的圖層不會輸出；完全重疊的外框只留一條。<br>校正方塊是綠色獨立圖層：匯入後量它是不是 50 mm，量完記得把綠色圖層設為不輸出。</p>
       <p class="note">時間只算雷射走線，沒算空跑和加減速，實際大約多 1～3 成。重心以整片平放計算，適合平衡鳥這類單片作品；黃點就是要讓支點對準的位置。</p>
     </section>
     <section>
@@ -213,7 +228,21 @@ function placeCam() {
   camera.position.set(t.x + d * Math.cos(phi) * Math.cos(theta), t.y + d * Math.cos(phi) * Math.sin(theta), t.z + d * Math.sin(phi));
   camera.lookAt(t);
   sun.position.copy(camera.position).add(new THREE.Vector3(40, -30, 120));
-  updateMeasureTag();
+  updateMeasureTag(); updateDimTags();
+}
+function updateDimTags() {
+  const box = document.getElementById('dimTags'); if (!box) return;
+  scene.updateMatrixWorld(); camera.updateMatrixWorld();   // 用這一幀的相機位置算，不然標籤會落後一步
+  const want = [];
+  if ($('lDim') && $('lDim').checked) for (const m of models) if (m.kind === 'laser' && m.visible && m.dimTags) for (const d of m.dimTags) want.push(d.p.clone().applyMatrix4(m.g.matrixWorld));
+  while (box.children.length < want.length) { const e = document.createElement('div'); e.className = 'dimTag'; box.appendChild(e); }
+  let i = 0;
+  for (const m of models) if (m.kind === 'laser' && m.visible && m.dimTags && $('lDim').checked) for (const d of m.dimTags) {
+    const e = box.children[i], w = want[i++].project(camera);
+    e.hidden = w.z > 1; e.textContent = d.t;
+    e.style.left = ((w.x + 1) / 2 * stage.clientWidth) + 'px'; e.style.top = ((1 - w.y) / 2 * stage.clientHeight) + 'px';
+  }
+  for (; i < box.children.length; i++) box.children[i].hidden = true;
 }
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
@@ -793,6 +822,11 @@ function buildLaser(m) {
   const L = m.laser, P = L.fmt === 'svg' ? parseSVGLaser(L.text, L.unit) : parseDXFLaser(L.text, L.unit);
   if (!P.paths.length) throw new Error('檔案裡沒有讀到任何線條' + (P.warn.text ? '（文字要先轉外框）' : ''));
   L.how = P.how; L.warn = P.warn;
+  let rb = [1e18, 1e18, -1e18, -1e18];
+  for (const p of P.paths) for (const [x, y] of p.pts) rb = [Math.min(rb[0], x), Math.min(rb[1], y), Math.max(rb[2], x), Math.max(rb[3], y)];
+  L.raw = { w: rb[2] - rb[0], h: rb[3] - rb[1] };
+  const ks = (L.scale || 100) / 100;
+  if (ks !== 1) for (const p of P.paths) p.pts = p.pts.map(([x, y]) => [x * ks, y * ks]);
   const lay = {}, byLayer = {};
   for (const p of P.paths) {
     if (!lay[p.layer]) lay[p.layer] = { key: p.layer, color: p.color, fill: p.fill, len: 0, n: 0 };
@@ -805,7 +839,9 @@ function buildLaser(m) {
   const hasRed = Object.values(lay).some((l) => !l.fill && isRed(l.color));
   for (const k in lay) if (!L.mode[k]) {
     const l = lay[k];
-    L.mode[k] = (l.fill || (hasRed && isBlue(l.color)) || /雕|刻|engrav|etch|mark|score/i.test(L.fmt === 'dxf' ? k : '')) ? 'eng' : 'cut';
+    const nm = L.fmt === 'dxf' ? k : '';
+    L.mode[k] = /check|校正/i.test(nm) ? 'skip'
+      : (l.fill || (hasRed && isBlue(l.color)) || /雕|刻|engrav|etch|mark|score|fill/i.test(nm)) ? 'eng' : 'cut';
   }
   const polys = [];
   for (const k in byLayer) for (const q of chainPolys(byLayer[k].map(normPoly).filter(Boolean))) { q.layer = k; polys.push(q); lay[k].len += polyLen(q); lay[k].n++; }
@@ -820,8 +856,9 @@ function buildLaser(m) {
   const uniq = [];
   for (const q of closed) {
     const twin = uniq.find((u) => Math.abs(Math.abs(u.A) - Math.abs(q.A)) <= Math.abs(q.A) * 1e-3 && q.bb.every((v, i) => Math.abs(v - u.bb[i]) <= SNAP * 2));
-    if (!twin) uniq.push(q);
+    if (!twin) uniq.push(q); else q.twin = true;
   }
+  L.exp = { cut: cut.filter((q) => !q.twin), eng: eng.map((q) => ({ pts: q.pts, closed: q.closed, fill: lay[q.layer].fill })) };
   for (let i = 0; i < uniq.length; i++) {
     const c = uniq[i], a = c.pts[0], b = c.pts[1], probe = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     c.parent = null; c.depth = 0;
@@ -886,6 +923,27 @@ function buildLaser(m) {
     const dg = new THREE.SphereGeometry(rDot, 12, 8), dm = new THREE.MeshBasicMaterial({ color: 0xe02424, depthTest: false });
     for (const q of openCut.slice(0, 400)) for (const p of [q.pts[0], q.pts[q.pts.length - 1]]) { const s = new THREE.Mesh(dg, dm); s.position.set(p[0], p[1], zTop); s.renderOrder = 9; m.g.add(s); }
   }
+  // 尺寸標註（平面圖學：延伸線＋尺寸線＋箭頭＋數字）
+  m.dimObj = null; m.dimTags = [];
+  {
+    const off = Math.max(4, diag * 0.07), gap = off * 0.18, ext = off * 0.25, ah = Math.max(1.2, diag * 0.018), z = zTop + 0.05, v = [];
+    const seg = (x1, y1, x2, y2) => v.push(x1, y1, z, x2, y2, z);
+    const yd = bb[1] - off, xd = bb[2] + off;
+    seg(bb[0], bb[1] - gap, bb[0], yd - ext); seg(bb[2], bb[1] - gap, bb[2], yd - ext); seg(bb[0], yd, bb[2], yd);
+    seg(bb[0], yd, bb[0] + ah, yd + ah * 0.35); seg(bb[0], yd, bb[0] + ah, yd - ah * 0.35);
+    seg(bb[2], yd, bb[2] - ah, yd + ah * 0.35); seg(bb[2], yd, bb[2] - ah, yd - ah * 0.35);
+    seg(bb[2] + gap, bb[1], xd + ext, bb[1]); seg(bb[2] + gap, bb[3], xd + ext, bb[3]); seg(xd, bb[1], xd, bb[3]);
+    seg(xd, bb[1], xd + ah * 0.35, bb[1] + ah); seg(xd, bb[1], xd - ah * 0.35, bb[1] + ah);
+    seg(xd, bb[3], xd + ah * 0.35, bb[3] - ah); seg(xd, bb[3], xd - ah * 0.35, bb[3] - ah);
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    const dl = new THREE.LineSegments(dg, new THREE.LineBasicMaterial({ color: new THREE.Color(cssVar('--accent') || '#e2630f'), depthTest: false }));
+    dl.renderOrder = 13; dl.visible = $('lDim').checked; m.g.add(dl); m.dimObj = dl;
+    m.dimTags = [
+      { p: new THREE.Vector3((bb[0] + bb[2]) / 2, yd, z), t: fmt(bb[2] - bb[0]) + ' mm' },
+      { p: new THREE.Vector3(xd, (bb[1] + bb[3]) / 2, z), t: fmt(bb[3] - bb[1]) + ' mm' },
+    ];
+    m.dimPad = off + ext;
+  }
   // 重心標記
   let cog = null; m.cogObj = null;
   if (area > 1e-3) {
@@ -899,7 +957,8 @@ function buildLaser(m) {
   }
 
   m.geo = geo; m.mesh = mesh; m.edges = edges; m.pos = pos; m.stats = null;
-  m.bbox = new THREE.Box3(new THREE.Vector3(bb[0], bb[1], 0), new THREE.Vector3(bb[2], bb[3], T));
+  const dp = $('lDim').checked ? m.dimPad : 0;
+  m.bbox = new THREE.Box3(new THREE.Vector3(bb[0], bb[1] - dp, 0), new THREE.Vector3(bb[2] + dp, bb[3], T));
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   m.lstats = {
     w: bb[2] - bb[0], h: bb[3] - bb[1], T, minx: bb[0], maxy: bb[3],
@@ -934,6 +993,7 @@ function layerLabel(m, ly) {
 function fmtTime(s) { const t = Math.round(s); if (t < 60) return t + ' 秒'; const h = Math.floor(t / 3600), mi = Math.floor(t / 60) % 60, se = t % 60; return (h ? h + ' 小時 ' : '') + mi + ' 分 ' + String(se).padStart(2, '0') + ' 秒'; }
 function renderLaserInfo(m) {
   const S = m.lstats, L = m.laser, mi = LMAT[lset.mat] || LMAT.basswood, [bw, bh] = parseBed($('bedSize').value);
+  renderScaleUI(m);
   $('infoTitle').textContent = '尺寸｜' + m.name;
   const fit = (S.w <= bw && S.h <= bh) ? '<span class="pill ok">放得下</span>' : (S.h <= bw && S.w <= bh ? '<span class="pill warn">轉 90° 才放得下</span>' : `<span class="pill bad">超出 ${bw} × ${bh}</span>`);
   const tSec = S.cutLen * (+lset.pass || 1) / Math.max(0.1, +lset.spd || 10) + S.engLen / Math.max(0.1, +lset.eng || 60);
@@ -950,6 +1010,7 @@ function renderLaserInfo(m) {
   $('info').innerHTML = `
     <dt>長 X</dt><dd>${fmt(S.w)}<span class="unit">mm</span></dd>
     <dt>寬 Y</dt><dd>${fmt(S.h)}<span class="unit">mm</span></dd>
+    ${(L.scale || 100) !== 100 ? `<dt>比例</dt><dd>${fmt(L.scale, 1)}<span class="unit">%</span></dd>` : ''}
     <dt>板厚</dt><dd>${fmt(S.T)}<span class="unit">mm</span></dd>
     <dt>工作範圍</dt><dd>${fit}</dd>
     <dt>零件</dt><dd>${S.pieces}<span class="unit">片</span>${S.holes ? `　${S.holes}<span class="unit">個孔</span>` : ''}</dd>
@@ -981,7 +1042,104 @@ $('lMat').onchange = () => { lset.mat = $('lMat').value; saveL(); rebuildLaser(l
 $('lThk').onchange = () => { lset.thk = Math.max(0.2, Math.min(50, +$('lThk').value || 3)); saveL(); rebuildLaser(laserModels(), true); };
 for (const [id, k, lo] of [['lSpd', 'spd', 0.1], ['lPass', 'pass', 1], ['lEng', 'eng', 0.1]])
   $(id).oninput = () => { const v = +$(id).value; if (v >= lo) { lset[k] = v; saveL(); renderInfo(); } };
+// --- 匯出上機用檔案：一律 mm，原點移到左下角 (0,0) ---
+function laserItems(m) {
+  const E = m.laser.exp, items = [];
+  for (const q of E.cut) items.push({ pts: q.pts, closed: q.closed, k: 'cut' });
+  for (const q of E.eng) items.push({ pts: q.pts, closed: q.closed, k: q.fill ? 'fill' : 'eng' });
+  if (!items.length) return null;
+  let bb = [1e18, 1e18, -1e18, -1e18];
+  for (const it of items) for (const [x, y] of it.pts) { bb = [Math.min(bb[0], x), Math.min(bb[1], y), Math.max(bb[2], x), Math.max(bb[3], y)]; }
+  const out = items.map((it) => ({ ...it, pts: it.pts.map(([x, y]) => [x - bb[0], y - bb[1]]) }));
+  let W = bb[2] - bb[0], H = bb[3] - bb[1];
+  if ($('lCal').checked) {   // 50 mm 校正方塊放在作品右邊 10 mm
+    const x0 = W + 10; out.push({ pts: [[x0, 0], [x0 + 50, 0], [x0 + 50, 50], [x0, 50]], closed: true, k: 'check' });
+    W = x0 + 50; H = Math.max(H, 50);
+  }
+  return { items: out, W, H };
+}
+const XLAY = { cut: ['CUT', 1, '#ff0000'], eng: ['ENGRAVE', 5, '#0000ff'], fill: ['FILL', 7, '#000000'], check: ['CHECK_50MM', 3, '#00a000'] };
+const n4 = (v) => (Math.round(v * 1e4) / 1e4).toString();
+function toDXF(D) {
+  const o = [], g = (c, v) => o.push(String(c), String(v));
+  const used = [...new Set(D.items.map((i) => i.k))];
+  g(0, 'SECTION'); g(2, 'HEADER');
+  g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$INSUNITS'); g(70, 4); g(9, '$MEASUREMENT'); g(70, 1);
+  g(9, '$EXTMIN'); g(10, 0); g(20, 0); g(30, 0); g(9, '$EXTMAX'); g(10, n4(D.W)); g(20, n4(D.H)); g(30, 0);
+  g(0, 'ENDSEC'); g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, used.length);
+  for (const k of used) { g(0, 'LAYER'); g(2, XLAY[k][0]); g(70, 0); g(62, XLAY[k][1]); g(6, 'CONTINUOUS'); }
+  g(0, 'ENDTAB'); g(0, 'ENDSEC'); g(0, 'SECTION'); g(2, 'ENTITIES');
+  for (const it of D.items) {
+    const [ln, col] = XLAY[it.k];
+    g(0, 'POLYLINE'); g(8, ln); g(62, col); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, it.closed ? 1 : 0);
+    for (const [x, y] of it.pts) { g(0, 'VERTEX'); g(8, ln); g(10, n4(x)); g(20, n4(y)); g(30, 0); }
+    g(0, 'SEQEND'); g(8, ln);
+  }
+  g(0, 'ENDSEC'); g(0, 'EOF');
+  return o.join('\r\n') + '\r\n';
+}
+function toSVG(D, name) {
+  const H = D.H, by = {};
+  for (const it of D.items) (by[it.k] = by[it.k] || []).push('M' + it.pts.map(([x, y]) => n4(x) + ' ' + n4(H - y)).join(' L') + (it.closed ? ' Z' : ''));
+  let body = '';
+  for (const k of Object.keys(by)) {
+    const [ln, , hexc] = XLAY[k], d = by[k].map((p) => `<path d="${p}"/>`).join('\n');
+    body += k === 'fill' ? `<g id="${ln}" fill="${hexc}" stroke="none">\n${d}\n</g>\n` : `<g id="${ln}" fill="none" stroke="${hexc}" stroke-width="0.1">\n${d}\n</g>\n`;
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!-- ${esc(name)}｜Maker 檔案檢視器匯出，單位 mm（1 單位 = 1 mm） -->\n`
+    + `<svg xmlns="http://www.w3.org/2000/svg" width="${n4(D.W)}mm" height="${n4(H)}mm" viewBox="0 0 ${n4(D.W)} ${n4(H)}">\n${body}</svg>\n`;
+}
+// 一般網站（GitHub）直接下載；在 Claude 的預覽頁裡改走平台的下載確認
+let dl = null;
+if (window.claude && window.claude.use) window.claude.use('downloads').then((d) => { dl = d; }).catch(() => {});
+async function saveFile(name, text, type) {
+  if (window.claude) {
+    if (!dl) { showError('這個預覽頁不能下載，請到 zhengxuetech.github.io/viewer 匯出。'); return; }
+    try { await dl.save({ filename: name, data: text }); }
+    catch (e) {
+      if (e && e.code === 'declined') return;
+      showError(e && (e.code === 'rejected_extension' || e.code === 'extension_not_enabled')
+        ? '這個預覽頁不能下載 ' + name.split('.').pop().toUpperCase() + '，請到 zhengxuetech.github.io/viewer 匯出。'
+        : '下載沒有成功，請到 zhengxuetech.github.io/viewer 匯出。');
+    }
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([text], { type })), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function doExport(kind) {
+  const m = models.find((x) => x.id === selId); if (!m || m.kind !== 'laser') return;
+  const D = laserItems(m); if (!D) { showError('沒有可以匯出的線條：圖層都設成「不用」了嗎？'); return; }
+  const base = m.name.replace(/\.(svg|dxf)$/i, '').replace(/[\\/:*?"<>|]/g, '_') + '_mm';
+  if (kind === 'dxf') saveFile(base + '.dxf', toDXF(D), 'application/dxf');
+  else saveFile(base + '.svg', toSVG(D, m.name), 'image/svg+xml');
+}
+$('lExpDxf').onclick = () => doExport('dxf');
+$('lExpSvg').onclick = () => doExport('svg');
 $('lCog').onchange = () => { lset.cog = $('lCog').checked; saveL(); for (const m of laserModels()) if (m.cogObj) m.cogObj.visible = lset.cog; requestDraw(); };
+// --- 比例：輸入 %、指定寬度或按常用倍率；比例看起來像 DPI／英吋問題時直接說原因 ---
+const RATIO_HINTS = [[4 / 3, '72 DPI 的檔案被當成 96 DPI 讀'], [3 / 4, '96 DPI 的檔案被當成 72 DPI 讀'], [25.4, '英吋被當成 mm'], [1 / 25.4, 'mm 被當成英吋'], [10, 'cm 被當成 mm'], [0.1, 'mm 被當成 cm']];
+function renderScaleUI(m) {
+  const L = m.laser, sc = L.scale || 100, k = sc / 100;
+  $('lScale').value = +sc.toFixed(3); $('lTargetW').value = '';
+  let note = `原檔 ${fmt(L.raw.w)} × ${fmt(L.raw.h)} mm`;
+  if (k !== 1) note += ` → ${fmt(L.raw.w * k)} × ${fmt(L.raw.h * k)} mm（${fmt(sc, 1)}%）`;
+  const h = RATIO_HINTS.find(([r]) => Math.abs(k / r - 1) < 0.006);
+  if (h) note += `。這個倍率通常代表「${h[1]}」。`;
+  else if (k === 1) note += '。匯出就照這個尺寸。';
+  else note += '。匯出會照放大縮小後的尺寸。';
+  $('lScaleNote').textContent = note;
+}
+function setScale(sc) {
+  const m = models.find((x) => x.id === selId); if (!m || m.kind !== 'laser') return;
+  if (!(sc > 0) || !isFinite(sc)) return;
+  m.laser.scale = Math.min(100000, Math.max(0.1, sc)); rebuildLaser([m], true);
+}
+$('lScale').onchange = () => setScale(+$('lScale').value);
+$('lTargetW').onchange = () => { const m = models.find((x) => x.id === selId), t = +$('lTargetW').value; if (m && m.kind === 'laser' && t > 0 && m.laser.raw.w > 0) setScale(t / m.laser.raw.w * 100); };
+$('lQuick').querySelectorAll('[data-s]').forEach((b) => b.onclick = () => setScale(+b.dataset.s));
+$('lDim').onchange = () => { layout(); fitView(); for (const m of laserModels()) { if (m.dimObj) m.dimObj.visible = $('lDim').checked; } rebuildLaser(laserModels(), true); };
 $('lUnit').onchange = () => { const m = models.find((x) => x.id === selId); if (!m || m.kind !== 'laser') return; m.laser.unit = $('lUnit').value; rebuildLaser([m], true); };
 
 // 範例：雷切手機支架（3 mm 板，側板 x2＋橫桿 x2，十字卡榫插接，插槽 2.9 mm 已扣切縫）
