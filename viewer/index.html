@@ -96,10 +96,10 @@ h3.sub{font-size:12px;color:var(--mute);margin:12px 0 2px;font-weight:700}
 </style>
 
 <header>
-  <h1>Maker 檔案檢視器<small>STL・SVG・DXF｜單位 mm</small></h1>
+  <h1>Maker 檔案檢視器<small>STL・3MF・SVG・DXF｜單位 mm</small></h1>
   <div class="sp"></div>
   <button class="btn pri" id="openBtn">開啟檔案</button>
-  <input type="file" id="fileIn" accept=".stl,.svg,.dxf,.zip" multiple hidden>
+  <input type="file" id="fileIn" accept=".stl,.3mf,.svg,.dxf,.zip" multiple hidden>
 </header>
 <main>
   <div id="stage">
@@ -115,7 +115,7 @@ h3.sub{font-size:12px;color:var(--mute);margin:12px 0 2px;font-weight:700}
     <section>
       <h2>檔案</h2>
       <div class="files" id="files"></div>
-      <p class="note">3D 列印開 .stl；雷切開 .svg、.dxf；也能直接開裝這些檔的 .zip。檔案只在這台電腦的瀏覽器裡讀，不會上傳。</p>
+      <p class="note">3D 列印開 .stl、.3mf；雷切開 .svg、.dxf；也能直接開裝這些檔的 .zip。3MF 裡每個物件會分開列出，照切片軟體的擺放顯示。檔案只在這台電腦的瀏覽器裡讀，不會上傳。</p>
       <div class="row" style="margin-top:6px;gap:6px 14px"><span class="note" style="margin:0">看範例：</span><button class="linkbtn" id="sSample">3D 列印（手機支架）</button><button class="linkbtn" id="lSample">雷切（手機支架）</button></div>
     </section>
     <section id="laserSec" hidden>
@@ -314,27 +314,111 @@ async function inflate(u8, fmt) {
   const ds = new DecompressionStream(fmt);
   return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(ds)).arrayBuffer());
 }
-async function unzip(buf) {
+async function zipRead(buf, want) {
   const u8 = new Uint8Array(buf), dv = new DataView(buf); let eocd = -1;
   for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
   if (eocd < 0) throw new Error('壓縮檔讀不到目錄');
   const cnt = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true); const out = [];
+  if (cnt === 0xffff || p === 0xffffffff) throw new Error('檔案太大（ZIP64），請在切片軟體裡另存成 STL');
   for (let k = 0; k < cnt; k++) {
     const flag = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
     const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), loc = dv.getUint32(p + 42, true);
     const nameBytes = u8.subarray(p + 46, p + 46 + nl);
-    let name; try { name = new TextDecoder((flag & 0x800) ? 'utf-8' : 'utf-8', { fatal: true }).decode(nameBytes); } catch { name = new TextDecoder('big5').decode(nameBytes); }
+    let name; try { name = new TextDecoder('utf-8', { fatal: true }).decode(nameBytes); } catch { name = new TextDecoder('big5').decode(nameBytes); }
     p += 46 + nl + el + cl;
-    if (!/\.(stl|svg|dxf)$/i.test(name) || /(^|\/)__MACOSX\//.test(name)) continue;
+    if (/(^|\/)__MACOSX\//.test(name) || name.endsWith('/') || !want(name)) continue;
     const ln = dv.getUint16(loc + 26, true), le = dv.getUint16(loc + 28, true), start = loc + 30 + ln + le, data = u8.subarray(start, start + csize);
     let raw;
     if (method === 0) raw = data.slice();
     else if (method === 8) raw = await inflate(data, 'deflate-raw');
     else throw new Error(name + '：不支援的壓縮方式');
-    out.push({ name: name.split('/').pop(), buf: raw.buffer });
+    out.push({ name, buf: raw.buffer });
   }
-  if (!out.length) throw new Error('壓縮檔裡沒有 STL、SVG 或 DXF');
   return out;
+}
+async function unzip(buf) {
+  const out = (await zipRead(buf, (n) => /\.(stl|3mf|svg|dxf)$/i.test(n))).map((f) => ({ name: f.name.split('/').pop(), buf: f.buf }));
+  if (!out.length) throw new Error('壓縮檔裡沒有 STL、3MF、SVG 或 DXF');
+  return out;
+}
+
+// ---------- 3MF ----------
+// 3MF 是 zip：根模型檔（通常 3D/3dmodel.model）列出物件與盤面擺放（build/item）。
+// 物件可以是網格，也可以由其他物件組成（component，Bambu 會指到 3D/Objects/*.model）。
+const UNIT3MF = { micron: 0.001, millimeter: 1, centimeter: 10, inch: 25.4, foot: 304.8, meter: 1000 };
+function m3(t) {   // "m00 m01 m02 m10 m11 m12 m20 m21 m22 m30 m31 m32"（列向量 × 矩陣）
+  if (!t) return null;
+  const a = t.trim().split(/\s+/).map(Number);
+  return a.length === 12 && a.every(Number.isFinite) ? a : null;
+}
+function m3mul(A, B) {   // 先套 A 再套 B
+  if (!A) return B; if (!B) return A;
+  const r = new Array(12);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+    r[i * 3 + j] = A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j] + (i === 3 ? B[9 + j] : 0);
+  }
+  return r;
+}
+async function parse3MF(buf) {
+  const files = await zipRead(buf, (n) => /\.model$/i.test(n) || /^_rels\/\.rels$/i.test(n));
+  const byPath = new Map(files.map((f) => ['/' + f.name.replace(/^\/+/, '').toLowerCase(), f.buf]));
+  let root = '/3d/3dmodel.model';
+  const rels = byPath.get('/_rels/.rels');
+  if (rels) {
+    const d = new DOMParser().parseFromString(decodeText(rels), 'application/xml');
+    for (const r of d.getElementsByTagName('Relationship')) if (/3dmodel$/i.test(r.getAttribute('Type') || '')) { root = '/' + (r.getAttribute('Target') || '').replace(/^\/+/, '').toLowerCase(); break; }
+  }
+  if (!byPath.has(root)) { const any = [...byPath.keys()].find((k) => k.endsWith('.model')); if (!any) throw new Error('這不是 3MF 檔，或檔案壞了'); root = any; }
+  const docs = new Map();
+  function doc(path) {
+    path = path.toLowerCase(); if (docs.has(path)) return docs.get(path);
+    const b = byPath.get(path); if (!b) throw new Error('3MF 少了 ' + path);
+    const x = new DOMParser().parseFromString(decodeText(b), 'application/xml');
+    if (x.getElementsByTagName('parsererror').length) throw new Error('3MF 的模型資料壞了');
+    const mdl = x.documentElement, objs = new Map();
+    for (const o of mdl.getElementsByTagName('object')) objs.set(o.getAttribute('id'), o);
+    const d = { mdl, objs, unit: UNIT3MF[(mdl.getAttribute('unit') || 'millimeter').toLowerCase()] || 1 };
+    docs.set(path, d); return d;
+  }
+  const P = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06';
+  function collect(path, id, M, out, depth) {
+    if (depth > 16) return;
+    const d = doc(path), o = d.objs.get(id); if (!o) return;
+    const mesh = [...o.children].find((c) => c.localName === 'mesh');
+    if (mesh) {
+      const vs = [], vEl = [...mesh.children].find((c) => c.localName === 'vertices'), tEl = [...mesh.children].find((c) => c.localName === 'triangles');
+      if (vEl) for (const v of vEl.children) {
+        let x = +v.getAttribute('x'), y = +v.getAttribute('y'), z = +v.getAttribute('z');
+        if (M) { const X = x * M[0] + y * M[3] + z * M[6] + M[9], Y = x * M[1] + y * M[4] + z * M[7] + M[10], Z = x * M[2] + y * M[5] + z * M[8] + M[11]; x = X; y = Y; z = Z; }
+        vs.push(x * d.unit, y * d.unit, z * d.unit);
+      }
+      if (tEl) for (const t of tEl.children) {
+        const a = +t.getAttribute('v1') * 3, b = +t.getAttribute('v2') * 3, c = +t.getAttribute('v3') * 3;
+        if (vs[a] === undefined || vs[b] === undefined || vs[c] === undefined) continue;
+        out.push(vs[a], vs[a + 1], vs[a + 2], vs[b], vs[b + 1], vs[b + 2], vs[c], vs[c + 1], vs[c + 2]);
+      }
+    }
+    const comps = [...o.children].find((c) => c.localName === 'components');
+    if (comps) for (const c of comps.children) {
+      if (c.localName !== 'component') continue;
+      const sub = c.getAttributeNS(P, 'path') || c.getAttribute('p:path');
+      collect(sub ? '/' + sub.replace(/^\/+/, '') : path, c.getAttribute('objectid'), m3mul(m3(c.getAttribute('transform')), M), out, depth + 1);
+    }
+  }
+  const R = doc(root), parts = [];
+  const build = [...R.mdl.children].find((c) => c.localName === 'build');
+  const items = build ? [...build.children].filter((c) => c.localName === 'item') : [...R.objs.keys()].map((id) => ({ getAttribute: (k) => (k === 'objectid' ? id : null) }));
+  const names = {};
+  for (const it of items) {
+    const id = it.getAttribute('objectid'), out = [];
+    collect(root, id, m3(it.getAttribute('transform')), out, 0);
+    if (!out.length) continue;
+    const o = R.objs.get(id); let nm = (o && o.getAttribute('name')) || ('物件 ' + id);
+    names[nm] = (names[nm] || 0) + 1; if (names[nm] > 1) nm += '（' + names[nm] + '）';
+    parts.push({ name: nm, pos: new Float32Array(out) });
+  }
+  if (!parts.length) throw new Error('3MF 裡沒有模型（切好片的 .gcode.3mf 請改開原本的專案檔）');
+  return parts;
 }
 
 // ---------- 模型 ----------
@@ -1163,18 +1247,19 @@ async function openFiles(list) {
   for (const f of list) {
     try {
       const buf = await f.arrayBuffer();
-      if (/\.zip$/i.test(f.name)) { for (const z of await unzip(buf)) { try { openOne(z.name, z.buf); } catch (err) { showError(z.name + '：' + err.message); } } }
-      else openOne(f.name, buf);
+      if (/\.zip$/i.test(f.name)) { for (const z of await unzip(buf)) { try { await openOne(z.name, z.buf); } catch (err) { showError(z.name + '：' + err.message); } } }
+      else await openOne(f.name, buf);
     } catch (err) { $('mres').textContent = ''; showError(f.name + '：' + err.message); }
   }
   if (sampleModel && models.length > 1 && models.includes(sampleModel)) removeModel(sampleModel.id), sampleModel = null;
   if (laserSample && models.length > 1 && models.includes(laserSample)) removeModel(laserSample.id), laserSample = null;
 }
-function openOne(name, buf) {
+async function openOne(name, buf) {
   if (/\.stl$/i.test(name)) addModel(name, parseSTL(buf));
+  else if (/\.3mf$/i.test(name)) { for (const pt of await parse3MF(buf)) addModel(pt.name, pt.pos); }
   else if (/\.svg$/i.test(name)) addLaserModel(name, 'svg', decodeText(buf));
   else if (/\.dxf$/i.test(name)) addLaserModel(name, 'dxf', decodeText(buf));
-  else throw new Error('只能開 STL、SVG、DXF，或裝這些檔的 zip');
+  else throw new Error('只能開 STL、3MF、SVG、DXF，或裝這些檔的 zip');
 }
 function showError(msg) { const box = $('files'); const d = document.createElement('div'); d.className = 'pill bad'; d.style.whiteSpace = 'normal'; d.textContent = msg; box.prepend(d); }
 $('openBtn').onclick = () => $('fileIn').click();
